@@ -2,9 +2,10 @@
 
 ### 인증
 
-- 이메일·카카오 회원가입과 로그인, 로그아웃 및 세션 관리는 클라이언트에서 Supabase Auth SDK로 처리한다.
-- 로그인 성공 시 Supabase Auth가 JWT 액세스 토큰을 발급하고, 클라이언트는 이후 요청에 `Authorization: Bearer {token}` 헤더를 사용한다.
-- Spring Security Resource Server는 Supabase JWKS로 JWT 서명과 `iss`, `exp`, `aud` 클레임을 검증한 뒤 API 접근을 제어한다.
+- 이메일·비밀번호 인증과 카카오 OAuth2 로그인은 Spring Security가 직접 처리한다.
+- 인증 성공 시 서버가 RSA 개인키로 서명한 JWT Access Token과 일회성 회전 방식의 Refresh Token을 발급한다.
+- 클라이언트는 API 요청에 `Authorization: Bearer {accessToken}` 헤더를 사용하고, Spring Security Resource Server는 공개키로 서명과 `iss`, `exp` 클레임을 검증한다.
+- Refresh Token은 원문을 저장하지 않고 해시하여 관리하며 재발급·로그아웃·회원탈퇴 시 폐기한다.
 - 인증 필요 API에 토큰 없이 접근 시 `401 UNAUTHORIZED` (FR-01-06).
 
 ### 공통 응답 포맷
@@ -35,6 +36,7 @@
 | --- | --- | --- |
 | `AUTH_001` | 401 | 인증 필요/토큰 만료 |
 | `AUTH_002` | 403 | 권한 없음 (타인 게시글 수정 등) |
+| `AUTH_003` | 401 | Refresh Token이 만료되었거나 폐기됨 |
 | `COMMON_001` | 404 | 리소스 없음 |
 | `COMMON_002` | 400 | 요청 값 검증 실패 |
 | `LOCATION_001` | 403 | 위치 수집 미동의 상태에서 위치 기반 API 호출 (FR-04-06) |
@@ -47,14 +49,42 @@
 
 # 1. 회원 (FR-01)
 
-회원가입, 이메일·카카오 로그인 및 로그아웃은 Supabase Auth API가 담당하므로 Spring Boot 인증 엔드포인트를 별도로 제공하지 않는다. 신규 인증 사용자의 `public.users` 프로필은 `auth.users` 생성 트리거로 초기화한다.
-
 | Method | Endpoint | 설명 | 인증 |
 | --- | --- | --- | --- |
+| POST | `/auth/signup` | 이메일 회원가입 | N |
+| POST | `/auth/login` | 이메일·비밀번호 로그인 및 토큰 발급 | N |
+| GET | `/oauth2/authorization/kakao` | 카카오 OAuth2 로그인 시작 | N |
+| GET | `/login/oauth2/code/kakao` | Spring Security 카카오 콜백 처리 | N |
+| POST | `/auth/oauth2/exchange` | 카카오 로그인용 일회성 코드를 서비스 토큰으로 교환 | N |
+| POST | `/auth/token/refresh` | Access/Refresh Token 재발급 및 Refresh Token 회전 | N |
+| POST | `/auth/logout` | 현재 Refresh Token 폐기 | Y |
 | DELETE | `/users/me` | 회원탈퇴 (FR-01-03) | Y |
 | GET | `/users/me` | 내 프로필 조회 (FR-01-04) | Y |
 | PATCH | `/users/me` | 닉네임/이미지/관심사 등 수정 (FR-01-05) | Y |
 | PATCH | `/users/me/location` | 현재 위치·수집 동의 갱신 (FR-04-06) | Y |
+
+**POST /auth/signup**
+
+```json
+{ "email": "user@test.com", "password": "********", "nickname": "혼밥탈출" }
+```
+
+**POST /auth/login 응답**
+
+```json
+{
+  "success": true,
+  "data": {
+    "tokenType": "Bearer",
+    "accessToken": "eyJ...",
+    "expiresIn": 3600,
+    "refreshToken": "random-opaque-token"
+  },
+  "error": null
+}
+```
+
+카카오 콜백 성공 시 JWT를 URL에 직접 노출하지 않는다. 서버는 짧은 만료시간의 일회성 코드를 생성해 프론트엔드로 리다이렉트하고, 클라이언트가 `/auth/oauth2/exchange`에서 서비스 토큰으로 교환한다.
 
 **PATCH /users/me**
 
