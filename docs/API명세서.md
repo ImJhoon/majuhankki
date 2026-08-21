@@ -1,0 +1,320 @@
+# 0. 공통 규약
+
+### 인증
+
+- 이메일·카카오 회원가입과 로그인, 로그아웃 및 세션 관리는 클라이언트에서 Supabase Auth SDK로 처리한다.
+- 로그인 성공 시 Supabase Auth가 JWT 액세스 토큰을 발급하고, 클라이언트는 이후 요청에 `Authorization: Bearer {token}` 헤더를 사용한다.
+- Spring Security Resource Server는 Supabase JWKS로 JWT 서명과 `iss`, `exp`, `aud` 클레임을 검증한 뒤 API 접근을 제어한다.
+- 인증 필요 API에 토큰 없이 접근 시 `401 UNAUTHORIZED` (FR-01-06).
+
+### 공통 응답 포맷
+
+성공:
+
+```json
+{
+  "success": true,
+  "data": {},
+  "error": null
+}
+```
+
+실패:
+
+```json
+{
+  "success": false,
+  "data": null,
+  "error": { "code": "AUTH_001", "message": "인증이 필요합니다." }
+}
+```
+
+### 공통 에러 코드 (예시)
+
+| 코드 | HTTP Status | 설명 |
+| --- | --- | --- |
+| `AUTH_001` | 401 | 인증 필요/토큰 만료 |
+| `AUTH_002` | 403 | 권한 없음 (타인 게시글 수정 등) |
+| `COMMON_001` | 404 | 리소스 없음 |
+| `COMMON_002` | 400 | 요청 값 검증 실패 |
+| `LOCATION_001` | 403 | 위치 수집 미동의 상태에서 위치 기반 API 호출 (FR-04-06) |
+
+### 페이지네이션 (목록 조회 공통 파라미터)
+
+`page` (기본 0), `size` (기본 20), `sort` — 응답에 `content`, `totalElements`, `hasNext` 포함.
+
+---
+
+# 1. 회원 (FR-01)
+
+회원가입, 이메일·카카오 로그인 및 로그아웃은 Supabase Auth API가 담당하므로 Spring Boot 인증 엔드포인트를 별도로 제공하지 않는다. 신규 인증 사용자의 `public.users` 프로필은 `auth.users` 생성 트리거로 초기화한다.
+
+| Method | Endpoint | 설명 | 인증 |
+| --- | --- | --- | --- |
+| DELETE | `/users/me` | 회원탈퇴 (FR-01-03) | Y |
+| GET | `/users/me` | 내 프로필 조회 (FR-01-04) | Y |
+| PATCH | `/users/me` | 닉네임/이미지/관심사 등 수정 (FR-01-05) | Y |
+| PATCH | `/users/me/location` | 현재 위치·수집 동의 갱신 (FR-04-06) | Y |
+
+**PATCH /users/me**
+
+```json
+{ "nickname": "새닉네임", "profileImageUrl": "https://...", "interests": ["등산", "보드게임"] }
+```
+
+**PATCH /users/me/location**
+
+```json
+{ "latitude": 37.501, "longitude": 127.039, "locationConsent": true }
+```
+
+<aside>
+📎
+
+`locationConsent: false`인 회원이 이후 위치 기반 API 호출 시 `LOCATION_001` 반환.
+
+</aside>
+
+---
+
+# 2. 모집 게시글 (FR-02)
+
+| Method | Endpoint | 설명 | 인증 |
+| --- | --- | --- | --- |
+| POST | `/posts` | 모집 게시글 작성 (FR-02-01~05) | Y |
+| GET | `/posts` | 게시글 목록 (필터: region, status, mealDate) | Y |
+| GET | `/posts/nearby` | 내 주변 게시글 조회 (FR-04-02) | Y |
+| GET | `/posts/{postId}` | 게시글 상세 | Y |
+| PATCH | `/posts/{postId}` | 게시글 수정 (작성자만, FR-02-08) | Y |
+| DELETE | `/posts/{postId}` | 게시글 삭제 (작성자만, FR-02-08) | Y |
+| POST | `/posts/{postId}/join` | 게시글 참여 신청 | Y |
+| DELETE | `/posts/{postId}/join` | 참여 취소 | Y |
+
+**POST /posts**
+
+```json
+{
+  "title": "강남역 국밥 같이 드실 분",
+  "description": "8시에 뵈어요",
+  "mealAt": "2026-08-25T19:00:00+09:00",
+  "region": "강남역",
+  "latitude": 37.498,
+  "longitude": 127.028,
+  "capacity": 3,
+  "recruitType": "SMALL"
+}
+```
+
+응답: `201 Created` — 생성된 게시글 (`status: OPEN`, `currentCount: 1`) 반환.
+
+**GET /posts/nearby**
+
+Query: `latitude`, `longitude`, `radiusKm` (기본 3, FR-04-04), `page`, `size`
+
+<aside>
+📎
+
+내부적으로 PostGIS `ST_DWithin`으로 반경 내 `status=OPEN` 게시글 조회, 거리순 정렬 (FR-04-03, FR-04-05).
+
+</aside>
+
+**POST /posts/{postId}/join**
+
+<aside>
+📎
+
+`currentCount == capacity`가 되면 서버가 게시글 `status`를 `CLOSED`로 자동 전환 (FR-02-09). 이미 모집이 찬 경우 `409 CONFLICT`.
+
+</aside>
+
+---
+
+# 3. 실시간 매칭 (FR-03) — REST + WebSocket
+
+| Method/프로토콜 | Endpoint | 설명 | 인증 |
+| --- | --- | --- | --- |
+| POST | `/matches/realtime/requests` | 실시간 매칭 요청 (FR-03-01~04) | Y |
+| DELETE | `/matches/realtime/requests/{requestId}` | 매칭 대기 취소 (FR-03-08) | Y |
+| GET | `/matches/realtime/requests/me` | 내 현재 대기 상태 조회 | Y |
+| WS(STOMP) SUBSCRIBE | `/user/queue/match-result` | 매칭 성사 결과 실시간 수신 (FR-03-07) | Y |
+
+**POST /matches/realtime/requests**
+
+```json
+{
+  "latitude": 37.501,
+  "longitude": 127.039,
+  "desiredTimeSlot": "2026-08-21T19:00:00+09:00",
+  "desiredGroupType": "1:1"
+}
+```
+
+응답:
+
+```json
+{ "success": true, "data": { "requestId": 55, "status": "WAITING" } }
+```
+
+<aside>
+📎
+
+동일 사용자가 이미 `WAITING` 상태면 `409 CONFLICT` (중복 참여 제한, FR-03-10). 서버는 Redis Geo 큐에 등록 후 조건에 맞는 상대를 탐색 (FR-03-06); 성사되면 `matches`/`match_participants`에 기록하고 STOMP로 두 사용자 모두에게 결과를 push. 일정 시간(TTL) 내 미매칭 시 상태가 `EXPIRED`로 자동 전환 (FR-03-09).
+
+</aside>
+
+**매칭 결과 push 메시지 예시** (`/user/queue/match-result`)
+
+```json
+{ "matchId": 301, "status": "MATCHED", "chatRoomId": 12, "partner": { "userId": "8ccaa7af-909f-44e7-84cb-67cdccb56be6", "nickname": "밥친구" } }
+```
+
+---
+
+# 4. 위치 (FR-04)
+
+위치 관련 API는 2장 (`/posts/nearby`)과 3장 (실시간 매칭 요청)에 통합되어 있으며, 별도 리소스는 아래와 같다.
+
+| Method | Endpoint | 설명 | 인증 |
+| --- | --- | --- | --- |
+| GET | `/matches/realtime/candidates` | 반경 내 매칭 대기자 수 미리보기 (선택, FR-04-04) | Y |
+
+**GET /matches/realtime/candidates**
+
+Query: `latitude`, `longitude`, `radiusKm`
+
+```json
+{ "success": true, "data": { "waitingCount": 4 } }
+```
+
+---
+
+# 5. 채팅 (FR-05) — REST(이력 조회) + WebSocket(실시간)
+
+| Method/프로토콜 | Endpoint | 설명 | 인증 |
+| --- | --- | --- | --- |
+| GET | `/chatrooms` | 내가 참여 중인 채팅방 목록 (FR-05-03) | Y |
+| GET | `/chatrooms/{roomId}/messages` | 이전 메시지 조회, 커서 기반 페이지네이션 (FR-05-04) | Y |
+| WS(STOMP) SEND | `/app/chat/{roomId}/send` | 메시지 전송 | Y |
+| WS(STOMP) SUBSCRIBE | `/topic/chat/{roomId}` | 메시지 실시간 수신 | Y |
+| PATCH | `/chatrooms/{roomId}/close` | 채팅방 종료 처리 (FR-05-06) | Y |
+
+<aside>
+📎
+
+`chat_room_participants`에 없는 사용자가 SUBSCRIBE/SEND 시도 시 서버가 연결을 거부 (FR-05-05).
+
+</aside>
+
+**GET /chatrooms/{roomId}/messages**
+
+Query: `cursor` (마지막으로 받은 messageId), `size` (기본 30)
+
+```json
+{
+  "success": true,
+  "data": {
+    "content": [
+      { "messageId": 1001, "senderId": "8ccaa7af-909f-44e7-84cb-67cdccb56be6", "content": "안녕하세요!", "sentAt": "2026-08-21T19:02:00+09:00" }
+    ],
+    "hasNext": true
+  }
+}
+```
+
+---
+
+# 6. 커뮤니티 (FR-06)
+
+| Method | Endpoint | 설명 | 인증 |
+| --- | --- | --- | --- |
+| POST | `/community/posts` | 게시글 작성 (FR-06-01) | Y |
+| GET | `/community/posts` | 목록 조회 (FR-06-02) | Y |
+| GET | `/community/posts/{postId}` | 상세 조회 (FR-06-02) | Y |
+| PATCH | `/community/posts/{postId}` | 수정 (작성자만, FR-06-03) | Y |
+| DELETE | `/community/posts/{postId}` | 삭제 (작성자만, FR-06-04) | Y |
+| POST | `/community/posts/{postId}/comments` | 댓글 작성 (FR-06-05) | Y |
+| GET | `/community/posts/{postId}/comments` | 댓글 목록 | Y |
+
+---
+
+# 7. 매칭 후기 / 방명록 (FR-07)
+
+| Method | Endpoint | 설명 | 인증 |
+| --- | --- | --- | --- |
+| POST | `/reviews` | 후기 작성 (FR-07-01, FR-07-03) | Y |
+| GET | `/users/{userId}/reviews` | 특정 사용자의 공개 후기 조회 (FR-07-02) | Y |
+| PATCH | `/reviews/{reviewId}/visibility` | 공개/비공개 전환 (FR-07-05) | Y |
+| POST | `/reviews/{reviewId}/report` | 후기 신고 (FR-07-04) | Y |
+
+**POST /reviews**
+
+```json
+{ "matchId": 301, "targetUserId": "8ccaa7af-909f-44e7-84cb-67cdccb56be6", "rating": 5, "content": "시간 약속을 잘 지키셨어요." }
+```
+
+<aside>
+📎
+
+서버는 `match_participants`에서 `writerId`(요청자)와 `targetUserId`가 같은 `matchId`에 실제로 참여했는지 검증 후 통과 시에만 저장 (FR-07-01). 조건 불충족 시 `403 AUTH_002`.
+
+</aside>
+
+---
+
+# 8. AI 식당 추천 (FR-08, 선택)
+
+| Method | Endpoint | 설명 | 인증 |
+| --- | --- | --- | --- |
+| POST | `/ai/restaurant-recommendations` | 조건 기반 식당 추천 요청 (FR-08-01, FR-08-02) | Y |
+
+요청:
+
+```json
+{ "region": "강남역", "foodType": "한식", "partySize": 3 }
+```
+
+응답:
+
+```json
+{
+  "success": true,
+  "data": {
+    "isAiGenerated": true,
+    "recommendations": [
+      { "name": "OO국밥", "reason": "인원수와 지역 조건에 맞는 한식 맛집" }
+    ]
+  }
+}
+```
+
+<aside>
+📎
+
+`isAiGenerated: true` 플래그로 AI 생성 결과임을 명시 (FR-08-04). 이 API 장애(타임아웃/5xx) 시에도 게시글·매칭 등 기본 기능에는 영향이 없어야 하므로, 프론트는 이 호출 실패를 별도로 격리 처리하고 나머지 화면은 정상 동작해야 한다 (FR-08-03). 서버 쪽도 별도 스레드풀/서킷브레이커 적용 권장.
+
+</aside>
+
+---
+
+# 9. 마이페이지 (FR-09)
+
+| Method | Endpoint | 설명 | 인증 |
+| --- | --- | --- | --- |
+| GET | `/mypage/profile` | 내 프로필 (FR-09-01) | Y |
+| GET | `/mypage/posts` | 내가 작성한 모집 게시글 (FR-09-02) | Y |
+| GET | `/mypage/matches` | 내 매칭 이력 (FR-09-03) | Y |
+| GET | `/mypage/community-posts` | 내가 작성한 커뮤니티 글 (FR-09-04) | Y |
+| GET | `/mypage/reviews` | 내가 받은 후기/방명록 (FR-09-05) | Y |
+
+<aside>
+📎
+
+회원 정보 수정은 1장의 `PATCH /users/me`를 그대로 재사용하는 것을 권장 (마이페이지 화면 전용 PATCH 엔드포인트를 따로 만들면 로직이 중복됨).
+
+</aside>
+
+---
+
+# 10. 향후 확장 (4순위, 미확정)
+
+관리자 API (`/admin/users`, `/admin/posts`, `/admin/reports` 등)와 신고/제재 플로우는 데이터 모델링 문서의 "관리자 (4순위)" 절과 함께 팀 논의 후 별도 명세로 추가 권장.

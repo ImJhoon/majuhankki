@@ -1,0 +1,88 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.0.7'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'org.example'
+version = '0.0.1-SNAPSHOT'
+description = 'project2'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    set('springAiVersion', "2.0.0")
+}
+
+dependencies {
+    // JPA 기반 엔티티 매핑과 데이터베이스 Repository를 지원
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    // Redis를 활용한 캐시와 임시 상태 저장을 지원
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    // 인증과 인가 등 Spring Security의 핵심 기능을 제공
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    // JWT 기반 API 인증과 OAuth2 리소스 서버 구성을 지원
+    implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-resource-server'
+    // 요청 DTO의 Bean Validation 검증 기능을 제공
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // Spring MVC 기반 REST API와 웹 애플리케이션 개발을 지원
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    // WebSocket과 STOMP 기반 실시간 통신을 지원
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+    // 애플리케이션 상태 확인과 운영 모니터링 엔드포인트를 제공
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    // PostGIS 등 공간 데이터 타입과 공간 쿼리를 Hibernate에서 지원
+    implementation 'org.hibernate.orm:hibernate-spatial'
+    // OpenAPI 문서와 Swagger UI를 자동으로 생성
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
+    // Google GenAI 채팅 모델을 Spring AI 인터페이스로 사용할 수 있게
+    implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
+    // Google GenAI 텍스트 임베딩 모델을 사용할 수 있게
+    implementation 'org.springframework.ai:spring-ai-starter-model-google-genai-embedding'
+    // PostgreSQL pgvector를 Spring AI VectorStore로 사용할 수 있게
+    implementation 'org.springframework.ai:spring-ai-starter-vector-store-pgvector'
+    // 컴파일 시 Lombok 어노테이션을 사용할 수 있게
+    compileOnly 'org.projectlombok:lombok'
+    // 개발 중 자동 재시작과 개발 편의 기능을 제공
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    // Actuator 메트릭을 Prometheus 형식으로 수집할 수 있게
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
+    // 실행 시 PostgreSQL 데이터베이스 연결에 필요한 JDBC 드라이버
+    runtimeOnly 'org.postgresql:postgresql'
+    // 메인 소스 컴파일 과정에서 Lombok 코드를 생성
+    annotationProcessor 'org.projectlombok:lombok'
+    // JPA 기능 테스트에 필요한 Spring Boot 테스트 지원을 제공
+    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+    // Spring Security 인증과 인가 테스트 도구를 제공
+    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+    // Bean Validation 관련 테스트 지원을 제공
+    testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
+    // Spring MVC 컨트롤러와 REST API 테스트를 지원
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    // WebSocket과 STOMP 기능 테스트를 지원
+    testImplementation 'org.springframework.boot:spring-boot-starter-websocket-test'
+    // 테스트 소스에서 Lombok 어노테이션을 사용할 수 있게
+    testCompileOnly 'org.projectlombok:lombok'
+    // JUnit Platform 기반 테스트 실행기를 제공
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    // 테스트 소스 컴파일 과정에서 Lombok 코드를 생성
+    testAnnotationProcessor 'org.projectlombok:lombok'
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+    }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

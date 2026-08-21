@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: project2
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${SUPABASE_AUTH_ISSUER}
+          jwk-set-uri: ${SUPABASE_JWK_SET_URI}
+          audiences: authenticated
