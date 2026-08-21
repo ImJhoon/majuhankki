@@ -26,13 +26,13 @@ dependencies {
     // JPA 기반 엔티티 매핑과 데이터베이스 Repository를 지원
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     // Redis를 활용한 캐시와 임시 상태 저장을 지원
-    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+//    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     // 인증과 인가 등 Spring Security의 핵심 기능을 제공
     implementation 'org.springframework.boot:spring-boot-starter-security'
     // 카카오 OAuth2 로그인을 Spring Security에서 직접 처리
-    implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client'
+//    implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client'
     // JWT 기반 API 인증과 OAuth2 리소스 서버 구성을 지원
-    implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-resource-server'
+//    implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-resource-server'
     // 요청 DTO의 Bean Validation 검증 기능을 제공
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     // Spring MVC 기반 REST API와 웹 애플리케이션 개발을 지원
@@ -46,11 +46,11 @@ dependencies {
     // OpenAPI 문서와 Swagger UI를 자동으로 생성
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
     // Google GenAI 채팅 모델을 Spring AI 인터페이스로 사용할 수 있게
-    implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
+//    implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
     // Google GenAI 텍스트 임베딩 모델을 사용할 수 있게
-    implementation 'org.springframework.ai:spring-ai-starter-model-google-genai-embedding'
+//    implementation 'org.springframework.ai:spring-ai-starter-model-google-genai-embedding'
     // PostgreSQL pgvector를 Spring AI VectorStore로 사용할 수 있게
-    implementation 'org.springframework.ai:spring-ai-starter-vector-store-pgvector'
+//    implementation 'org.springframework.ai:spring-ai-starter-vector-store-pgvector'
     // 컴파일 시 Lombok 어노테이션을 사용할 수 있게
     compileOnly 'org.projectlombok:lombok'
     // 개발 중 자동 재시작과 개발 편의 기능을 제공
