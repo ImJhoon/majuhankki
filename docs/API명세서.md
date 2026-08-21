@@ -3,8 +3,8 @@
 ### 인증
 
 - 이메일·비밀번호 인증과 카카오 OAuth2 로그인은 Spring Security가 직접 처리한다.
-- 인증 성공 시 서버가 RSA 개인키로 서명한 JWT Access Token과 일회성 회전 방식의 Refresh Token을 발급한다.
-- 클라이언트는 API 요청에 `Authorization: Bearer {accessToken}` 헤더를 사용하고, Spring Security Resource Server는 공개키로 서명과 `iss`, `exp` 클레임을 검증한다.
+- 인증 성공 시 서버가 환경변수로 관리하는 공통 비밀키와 HS256(HMAC-SHA256) 알고리즘으로 생성한 JWT Access Token과 일회성 회전 방식의 Refresh Token을 발급한다.
+- 클라이언트는 API 요청에 `Authorization: Bearer {accessToken}` 헤더를 사용하고, Spring Security Resource Server는 동일한 비밀키로 JWT의 MAC과 `iss`, `aud`, `exp` 클레임을 검증한다. 허용 알고리즘은 HS256으로 제한한다.
 - Refresh Token은 원문을 저장하지 않고 해시하여 관리하며 재발급·로그아웃·회원탈퇴 시 폐기한다.
 - 인증 필요 API에 토큰 없이 접근 시 `401 UNAUTHORIZED` (FR-01-06).
 
