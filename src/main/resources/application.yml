@@ -19,9 +19,7 @@ spring:
 #            token-uri: https://kauth.kakao.com/oauth/token
 #            user-info-uri: https://kapi.kakao.com/v2/user/me
 #            user-name-attribute: id
-#      resourceserver:
-#        jwt:
-#          public-key-location: ${JWT_PUBLIC_KEY_LOCATION}
+
   profiles:
     active:
       - dev
@@ -30,10 +28,12 @@ spring:
   config:
     import: optional:file:.env[.properties]
 
-#app:
-#  security:
-#    jwt:
-#      issuer: ${JWT_ISSUER:project2}
-#      private-key-location: ${JWT_PRIVATE_KEY_LOCATION}
-#      access-token-ttl: PT1H
-#      refresh-token-ttl: P14D
+app:
+  auth:
+    password:
+      encoding-id: argon2
+    jwt:
+      issuer: ${JWT_ISSUER:project2}
+      secret-key: ${JWT_SECRET}
+      access-token-expiry: 15m
+      refresh-token-expiry: 14d
