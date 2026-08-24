@@ -33,6 +33,7 @@ public class UserLocationPreference {
     @Column(name = "user_id")
     private UUID userId;
 
+    // 연관 관계가 있는 대상 엔티티(User)의 기본 키(PK)를 현재 엔티티의 기본 키(PK)이자 외래 키(FK)로 매핑하여 공유 식별자 관계를 맺어줍니다.
     @MapsId
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
