@@ -28,7 +28,6 @@ public class JwtFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        System.out.println("JwtFilter.doFilterInternal");
         try {
             // 1. extractToken (cookie, header)
             String token = extractToken(request); // request -> cookie, header...
@@ -46,7 +45,6 @@ public class JwtFilter extends OncePerRequestFilter {
             System.out.println("인증 완료");
         } catch (Exception e) {
 //            e.printStackTrace();
-            System.out.println("e.getMessage() = " + e.getMessage());
             if (!refreshAuth(request, response)) {
                 SecurityContextHolder.clearContext();
             }
@@ -63,7 +61,6 @@ public class JwtFilter extends OncePerRequestFilter {
             for (Cookie cookie : cookies) {
                 if (cookie.getName().equals("refreshToken")) {
                     String refreshToken = cookie.getValue();
-                    System.out.println("refreshToken: %s".formatted(refreshToken));
                     Claims claims = jwtProvider.parseToken(refreshToken);
                     // claims.getId() -> jti -> redis -> refresh token 존재 여부를 검사
                     if (!refreshTokenRepository.existsById(claims.getId())) {
@@ -100,7 +97,6 @@ public class JwtFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(authHeader) && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7); // 'Bearer '
             if (!StringUtils.hasText(token)) {
-                System.out.println("header: %s".formatted(token));
                 return token;
             }
         }
@@ -109,7 +105,6 @@ public class JwtFilter extends OncePerRequestFilter {
         if (cookies == null) return null; // 어차피 claims 시에 문제가 생기므로...
         for (Cookie cookie : cookies) {
             if (cookie.getName().equals("accessToken")) {
-                System.out.println("cookie: %s".formatted(cookie.getValue()));
                 return cookie.getValue(); // JWT
             }
         }
