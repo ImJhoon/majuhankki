@@ -23,6 +23,14 @@ ext {
 }
 
 dependencies {
+    // --- jwt (jjwt)
+    // Source: https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt-api
+    implementation 'io.jsonwebtoken:jjwt-api:0.13.0'
+    // Source: https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt-impl
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'
+    // Source: https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt-jackson
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
+
     // JPA 기반 엔티티 매핑과 데이터베이스 Repository를 지원
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     // Redis를 활용한 캐시와 임시 상태 저장을 지원
