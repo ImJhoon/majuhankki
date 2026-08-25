@@ -15,9 +15,9 @@ public class AuthCookieUtil {
     public ResponseCookie createRefreshTokenCookie(String token) {
         return ResponseCookie.from("refreshToken", token)
                 .httpOnly(true)
-                .secure(true)
-                .sameSite("Strict")
-                .path("/auth")
+                .secure(false)
+                .sameSite("Lax")
+                .path("/")
                 .maxAge(p.jwt().refreshTokenExpiry())
                 .build();
     }
@@ -25,9 +25,9 @@ public class AuthCookieUtil {
     public ResponseCookie deleteRefreshTokenCookie() {
         return ResponseCookie.from("refreshToken", "")
                 .httpOnly(true)
-                .secure(true)
-                .sameSite("Strict")
-                .path("/auth")
+                .secure(false)
+                .sameSite("Lax")
+                .path("/")
                 .maxAge(0)
                 .build();
     }
@@ -35,8 +35,8 @@ public class AuthCookieUtil {
     public ResponseCookie createAccessTokenCookie(String token) {
         return ResponseCookie.from("accessToken", token)
                 .httpOnly(true)
-                .secure(true)
-                .sameSite("Strict")
+                .secure(false)
+                .sameSite("Lax")
                 .path("/")
                 .maxAge(p.jwt().accessTokenExpiry())
                 .build();
@@ -45,8 +45,17 @@ public class AuthCookieUtil {
     public ResponseCookie deleteAccessTokenCookie() {
         return ResponseCookie.from("accessToken", "")
                 .httpOnly(true)
-                .secure(true)
-                .sameSite("Strict")
+                .secure(false)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(0)
+                .build();
+    }
+
+    public ResponseCookie deleteCsrfCookie() {
+        return ResponseCookie.from("XSRF-TOKEN", "")
+                .secure(false)
+                .sameSite("Lax")
                 .path("/")
                 .maxAge(0)
                 .build();

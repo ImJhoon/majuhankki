@@ -109,12 +109,12 @@ class SecurityIntegrationTest {
         mockMvc.perform(get("/auth/csrf"))
                 .andExpect(status().isNoContent())
                 .andExpect(cookie().exists("XSRF-TOKEN"))
-                .andExpect(cookie().secure("XSRF-TOKEN", true))
+                .andExpect(cookie().secure("XSRF-TOKEN", false))
                 .andExpect(cookie().httpOnly("XSRF-TOKEN", false))
                 .andExpect(result -> assertThat(result.getResponse()
                         .getCookie("XSRF-TOKEN")
                         .getAttribute("SameSite"))
-                        .isEqualTo("Strict"));
+                        .isEqualTo("Lax"));
     }
 
     @Test

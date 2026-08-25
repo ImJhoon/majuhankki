@@ -80,13 +80,7 @@ export async function login(email, password) {
  * 로그아웃을 수행하고 브라우저 세션을 지웁니다.
  */
 export async function logout() {
-  let csrfToken = null
-  try {
-    await issueCsrfToken()
-    csrfToken = readCookie('XSRF-TOKEN')
-  } catch (e) {
-    console.warn('CSRF 토큰 발급 실패. 로그아웃을 강제 진행합니다.', e)
-  }
+  const csrfToken = readCookie('XSRF-TOKEN')
 
   const headers = {}
   if (csrfToken) {
