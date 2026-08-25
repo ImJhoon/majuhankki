@@ -7,6 +7,8 @@ import org.example.project2.domain.auth.dto.OAuthTokenExchangeRequest;
 import org.example.project2.domain.auth.dto.OAuthTokenExchangeResponse;
 import org.example.project2.domain.auth.service.local.AuthService;
 import org.example.project2.domain.auth.service.oauth.OAuthTokenExchangeService;
+import org.example.project2.domain.auth.service.token.RefreshTokenService;
+import org.example.project2.domain.user.entity.UserRole;
 import org.example.project2.global.security.SecurityConfig;
 import org.example.project2.global.security.csrf.CsrfCookieFilter;
 import org.example.project2.global.security.csrf.SpaCsrfTokenRequestHandler;
@@ -32,8 +34,10 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -65,6 +69,9 @@ class AuthControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private JwtProvider jwtProvider;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @MockitoBean
@@ -72,6 +79,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private OAuthTokenExchangeService oauthTokenExchangeService;
+
+    @MockitoBean
+    private RefreshTokenService refreshTokenService;
 
     @MockitoBean
     private AuthCookieUtil authCookieUtil;
@@ -93,9 +103,6 @@ class AuthControllerTest {
 
     @MockitoBean
     private OAuth2AuthenticationFailureHandler oauth2AuthenticationFailureHandler;
-
-    @MockitoBean
-    private org.example.project2.domain.auth.service.token.RefreshTokenService refreshTokenService;
 
     @Test
     void signUpSuccess() throws Exception {
@@ -174,5 +181,64 @@ class AuthControllerTest {
                 setCookieHeaders.stream().anyMatch(h -> h.contains("refreshToken=refresh-token")),
                 "Set-Cookie 헤더에 refreshToken 쿠키가 포함되어야 합니다."
         );
+    }
+
+    @Test
+    void oauthCodeExchangeHasOpenApiContract() throws Exception {
+        var method = AuthController.class.getDeclaredMethod(
+                "exchangeOAuthCode",
+                OAuthTokenExchangeRequest.class,
+                jakarta.servlet.http.HttpServletResponse.class
+        );
+        var operation = method.getAnnotation(io.swagger.v3.oas.annotations.Operation.class);
+        var parameters = method.getAnnotation(io.swagger.v3.oas.annotations.Parameters.class);
+        var responses = method.getAnnotation(io.swagger.v3.oas.annotations.responses.ApiResponses.class);
+        var codeSchema = OAuthTokenExchangeRequest.class
+                .getRecordComponents()[0]
+                .getAccessor()
+                .getAnnotation(io.swagger.v3.oas.annotations.media.Schema.class);
+
+        assertThat(operation.summary()).isEqualTo("OAuth 일회성 코드 교환");
+        assertThat(parameters.value()).extracting(io.swagger.v3.oas.annotations.Parameter::name)
+                .containsExactly("X-XSRF-TOKEN");
+        assertThat(responses.value())
+                .extracting(io.swagger.v3.oas.annotations.responses.ApiResponse::responseCode)
+                .containsExactly("200", "400", "401");
+        assertThat(codeSchema.description()).contains("한 번만 사용할 수 있는");
+    }
+
+    @Test
+    void logoutRevokesRefreshTokenAndDeletesCookie() throws Exception {
+        String accessToken = jwtProvider.issueToken(UUID.randomUUID(), UserRole.USER);
+        when(authCookieUtil.deleteRefreshTokenCookie())
+                .thenReturn(ResponseCookie.from("refreshToken", "")
+                        .httpOnly(true)
+                        .secure(true)
+                        .sameSite("Strict")
+                        .path("/auth")
+                        .maxAge(0)
+                        .build());
+        when(authCookieUtil.deleteAccessTokenCookie())
+                .thenReturn(ResponseCookie.from("accessToken", "")
+                        .httpOnly(true)
+                        .secure(true)
+                        .sameSite("Strict")
+                        .path("/")
+                        .maxAge(0)
+                        .build());
+
+        mockMvc.perform(post("/auth/logout")
+                        .with(csrf())
+                        .header("Authorization", "Bearer " + accessToken)
+                        .cookie(new jakarta.servlet.http.Cookie("refreshToken", "refresh-token")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").isEmpty())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Set-Cookie", org.hamcrest.Matchers.allOf(
+                                org.hamcrest.Matchers.containsString("accessToken="),
+                                org.hamcrest.Matchers.containsString("Max-Age=0"))));
+
+        verify(refreshTokenService).revoke("refresh-token");
     }
 }
