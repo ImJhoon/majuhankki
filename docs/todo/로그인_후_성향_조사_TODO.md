@@ -97,28 +97,28 @@
 - [x] `UserPersonalityEmbedding`, `UserMatchingPreference` Entity가 존재하는지 확인한다.
 - [x] `user_personality_tags` 테이블을 `UserPersonalityProfile`의 `@ElementCollection`으로 추가한다.
 - [x] `PersonalityTag`를 문자열 Enum으로 저장하고 `(user_id, tag_code)`에 고유 제약조건을 설정한다.
-- [ ] `user_food_preferences` 테이블과 Entity를 성향 데이터와 분리하여 추가한다.
-- [ ] 음식 카테고리는 문자열 Enum으로 저장하고 `(user_id, food_category)`를 복합 고유 키로 설정한다.
-- [ ] `users.personality_onboarding_status` 컬럼과 `NOT_STARTED/SKIPPED/COMPLETED` Enum을 추가한다.
-- [ ] 신규 Entity는 지연 로딩, 문자열 Enum, 사용자 외래 키 및 삭제 정책을 확인한다.
-- [x] `user_personality_tags` 테이블과 제약조건을 `docs/데이터모델링.md`에 반영한다.
+- [x] `user_food_preferences` 테이블을 `User`의 `@ElementCollection`으로 성향 데이터와 분리하여 추가한다.
+- [x] `FoodCategory`를 문자열 Enum으로 저장하고 `(user_id, food_category)`에 고유 제약조건을 설정한다.
+- [x] `users.personality_onboarding_status` 컬럼과 `NOT_STARTED/SKIPPED/COMPLETED` Enum을 추가한다.
+- [x] 신규 Entity는 지연 로딩, 문자열 Enum, 사용자 외래 키 및 `ON DELETE CASCADE` 삭제 정책을 확인한다.
+- [x] `user_personality_tags`, `user_food_preferences` 테이블과 제약조건을 `docs/specs/데이터모델링.md`에 반영한다.
 
 ## 3. 백엔드 MVP
 
-- [ ] 기본 스타일 버전·차원·선택값·태그·음식 카테고리 Enum을 구현한다.
-- [ ] 성향 프로필, 원본 응답, 태그, 음식 선호 Repository를 구현한다.
-- [ ] 제출 DTO에 버전, 네 차원 누락·중복, 허용값 `1/3/5`, 태그·음식 개수 및 지원 코드 검증을 추가한다.
-- [ ] `(응답값 - 1) / 4 × 100` 점수 계산 컴포넌트를 순수 Java로 구현한다.
-- [ ] 프로필·답변·태그의 최초 제출과 전체 재제출을 하나의 트랜잭션으로 처리한다.
-- [ ] `GET /users/me/personality-profile` 조회 API를 구현한다.
-- [ ] `PUT /users/me/personality-profile` 기본 스타일·태그 제출 API를 구현한다.
-- [ ] `DELETE /users/me/personality-profile` 프로필·답변·태그 초기화 API를 구현한다.
-- [ ] `POST /users/me/personality-profile/skip` 건너뛰기 상태 저장 API를 구현한다.
-- [ ] `GET /users/me/food-preferences` 음식 선호 조회 API를 구현한다.
-- [ ] `PUT /users/me/food-preferences` 음식 선호 전체 갱신 API를 구현한다.
-- [ ] JWT의 사용자 UUID로 본인 데이터만 조회·수정하도록 제한한다.
-- [ ] 잘못된 버전·응답·태그·음식 코드에는 `PERSONALITY_002` 또는 확정한 오류 코드를 반환한다.
-- [ ] Swagger에 요청·응답·오류·인증 쿠키·CSRF 요구사항을 문서화한다.
+- [x] 기본 스타일 버전·차원·선택값·태그·음식 카테고리 Enum을 구현한다.
+- [x] 성향 프로필과 원본 응답 Repository를 구현하고, 태그·음식 선호는 각 Aggregate의 `@ElementCollection`으로 저장한다.
+- [x] 제출 DTO에 버전, 네 차원 누락·중복, 허용값 `1/3/5`, 태그·음식 개수 및 지원 코드 검증을 추가한다.
+- [x] `(응답값 - 1) / 4 × 100` 점수 계산 컴포넌트를 순수 Java로 구현한다.
+- [x] 프로필·답변·태그의 최초 제출과 전체 재제출을 하나의 트랜잭션으로 처리한다.
+- [x] `GET /users/me/personality-profile` 조회 API를 구현한다.
+- [x] `PUT /users/me/personality-profile` 기본 스타일·태그 제출 API를 구현한다.
+- [x] `DELETE /users/me/personality-profile` 프로필·답변·태그 초기화 API를 구현한다.
+- [x] `POST /users/me/personality-profile/skip` 건너뛰기 상태 저장 API를 구현한다.
+- [x] `GET /users/me/food-preferences` 음식 선호 조회 API를 구현한다.
+- [x] `PUT /users/me/food-preferences` 음식 선호 전체 갱신 API를 구현한다.
+- [x] JWT의 사용자 UUID로 본인 데이터만 조회·수정하도록 제한한다.
+- [x] 잘못된 버전·응답·태그·음식 코드에는 `PERSONALITY_002`를 반환한다.
+- [x] Swagger에 요청·응답·오류·인증 쿠키·CSRF 요구사항을 문서화한다.
 
 ## 4. 프론트엔드 MVP
 
@@ -153,7 +153,7 @@
 - [ ] `NOT_STARTED → SKIPPED → COMPLETED → NOT_STARTED` 상태 전이 테스트를 작성한다.
 - [ ] 타인의 원본 성향 데이터에 접근할 수 없는 보안 테스트를 작성한다.
 - [ ] 프론트엔드에서 미완료·완료·건너뛰기·401 흐름을 수동 확인한다.
-- [ ] `docs/API명세서.md`, `docs/기능명세서.md`, `docs/데이터모델링.md`를 확정된 계약과 동기화한다.
+- [ ] `docs/specs/API명세서.md`, `docs/specs/기능명세서.md`, `docs/specs/데이터모델링.md`를 확정된 계약과 동기화한다.
 - [ ] Java 변경 후 `gradlew.bat compileJava`와 `gradlew.bat test`를 실행한다.
 - [ ] 테스트 로그에 `CommandAcceptanceException` 또는 Hibernate DDL 오류가 없는지 확인한다.
 

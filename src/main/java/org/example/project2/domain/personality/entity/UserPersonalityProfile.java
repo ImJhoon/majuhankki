@@ -22,6 +22,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.project2.domain.user.entity.User;
 import org.hibernate.annotations.Check;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -36,7 +38,8 @@ import java.util.UUID;
 @Check(constraints = "conversation_level BETWEEN 0 AND 100 " +
         "AND meal_pace BETWEEN 0 AND 100 " +
         "AND planning_style BETWEEN 0 AND 100 " +
-        "AND novelty_preference BETWEEN 0 AND 100")
+        "AND novelty_preference BETWEEN 0 AND 100 " +
+        "AND questionnaire_version = 'MEAL_PERSONALITY_V1'")
 @Getter
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -49,10 +52,12 @@ public class UserPersonalityProfile {
     @MapsId
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private User user;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "questionnaire_version", nullable = false, length = 50)
-    private String questionnaireVersion;
+    private PersonalityQuestionnaireVersion questionnaireVersion;
 
     @Column(name = "conversation_level", nullable = false)
     private short conversationLevel;
@@ -79,6 +84,7 @@ public class UserPersonalityProfile {
     )
     @Enumerated(EnumType.STRING)
     @Column(name = "tag_code", nullable = false, length = 50)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private Set<PersonalityTag> styleTags = new HashSet<>();
 
     @Builder.Default
@@ -91,4 +97,23 @@ public class UserPersonalityProfile {
     @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    public void replace(
+            PersonalityQuestionnaireVersion questionnaireVersion,
+            short conversationLevel,
+            short mealPace,
+            short planningStyle,
+            short noveltyPreference,
+            Set<PersonalityTag> styleTags,
+            Instant completedAt
+    ) {
+        this.questionnaireVersion = questionnaireVersion;
+        this.conversationLevel = conversationLevel;
+        this.mealPace = mealPace;
+        this.planningStyle = planningStyle;
+        this.noveltyPreference = noveltyPreference;
+        this.styleTags.clear();
+        this.styleTags.addAll(styleTags);
+        this.completedAt = completedAt;
+    }
 }
