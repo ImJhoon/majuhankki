@@ -102,11 +102,10 @@ public class SecurityConfig {
 
     @Bean
     public CookieCsrfTokenRepository csrfTokenRepository() {
-        // CSRF 토큰 쿠키는 프론트엔드 자바스크립트가 읽어서 헤더에 담아야 하므로 HttpOnly = false로 설정
         CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         repository.setCookieCustomizer(cookie -> cookie
-                .secure(true) // HTTPS 암호화 통신에서만 전송
-                .sameSite("Strict") // 다른 사이트에서 시작된 요청에 쿠키가 전송되는 것을 제한
+                .secure(false) // 로컬 HTTP 테스트를 위해 false로 설정
+                .sameSite("Lax") // 크로스 오리진 요청 간 전송을 위해 Lax로 완화
                 .path("/")); // Refresh Token 쿠키를 인증 관련 경로에만 전송
         return repository;
     }

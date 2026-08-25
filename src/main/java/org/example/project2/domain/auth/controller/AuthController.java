@@ -198,6 +198,7 @@ public class AuthController {
 
         response.addHeader(HttpHeaders.SET_COOKIE, authCookieUtil.deleteAccessTokenCookie().toString());
         response.addHeader(HttpHeaders.SET_COOKIE, authCookieUtil.deleteRefreshTokenCookie().toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, authCookieUtil.deleteCsrfCookie().toString());
 
         return ResponseEntity.ok(CommonResponse.success(null));
     }
