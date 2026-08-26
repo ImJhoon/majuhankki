@@ -98,6 +98,10 @@ export async function renderPreferredRegionPage(container) {
   let initialLng = 126.9016
   let initialLocName = '서울특별시 마포구'
 
+  let initialSido = '서울특별시'
+  let initialSigungu = '마포구'
+  let initialDetail = ''
+
   try {
     const resp = await fetch(`${API_BASE_URL}/users/me/preferred-region`, { credentials: 'include' })
     if (resp.ok) {
@@ -116,6 +120,9 @@ export async function renderPreferredRegionPage(container) {
             initialLat = target.lat
             initialLng = target.lng
             initialLocName = pref.regionName
+            initialSido = s
+            initialSigungu = sig
+            initialDetail = d
           }
         }
       }
@@ -146,15 +153,40 @@ export async function renderPreferredRegionPage(container) {
 
       <!-- 지도 및 컨트롤 영역 -->
       <div class="w-full flex flex-col gap-4">
-        <!-- 주소 입력 바 -->
+        <!-- 필터 바 (시도 / 시군구 / 구 선택) -->
         <div class="flex flex-col sm:flex-row items-center gap-3 bg-surface-container-lowest p-3 rounded-card shadow-soft border border-outline-variant/30 relative">
-          <div class="relative w-full sm:flex-1">
-            <input id="input-preferred-address" type="text" placeholder="예: 서울 마포구 백범로 35" class="w-full bg-surface border border-outline-variant/40 text-on-surface rounded-full py-2.5 pl-10 pr-4 focus:ring-2 focus:ring-primary-container focus:border-primary-container text-sm font-medium" />
-            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary text-xl pointer-events-none">search</span>
+          <!-- 시·도 커스텀 드롭다운 -->
+          <div class="relative w-full sm:flex-1 dropdown-container" id="pref-sido-dropdown-container">
+            <button id="btn-pref-sido-dropdown" type="button" class="w-full bg-surface border border-outline-variant/40 text-on-surface rounded-full py-2.5 pl-10 pr-4 focus:ring-2 focus:ring-primary-container focus:border-primary-container text-sm font-medium text-left flex items-center justify-between cursor-pointer">
+              <span id="text-pref-sido-selected" class="truncate text-secondary">시·도 선택</span>
+              <span class="material-symbols-outlined text-secondary text-lg">arrow_drop_down</span>
+            </button>
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary text-xl pointer-events-none">map</span>
+            <ul id="list-pref-sido-options" class="absolute left-0 top-full mt-2 w-full bg-white border border-outline-variant/20 rounded-2xl shadow-lg max-h-60 overflow-y-auto z-50 hidden transition-all duration-150 py-1">
+            </ul>
           </div>
-          <button id="btn-search-address" class="w-full sm:w-auto btn-primary py-2.5 px-6 rounded-full text-sm font-bold flex items-center justify-center gap-2 shrink-0">
-            <span>주소 검색</span>
-          </button>
+
+          <!-- 시·군·구 커스텀 드롭다운 -->
+          <div class="relative w-full sm:flex-1 dropdown-container" id="pref-sigungu-dropdown-container">
+            <button id="btn-pref-sigungu-dropdown" type="button" class="w-full bg-surface border border-outline-variant/40 text-on-surface rounded-full py-2.5 pl-10 pr-4 focus:ring-2 focus:ring-primary-container focus:border-primary-container text-sm font-medium text-left flex items-center justify-between cursor-not-allowed opacity-50" disabled>
+              <span id="text-pref-sigungu-selected" class="truncate text-secondary">시·군·구 선택</span>
+              <span class="material-symbols-outlined text-secondary text-lg">arrow_drop_down</span>
+            </button>
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary text-xl pointer-events-none">explore</span>
+            <ul id="list-pref-sigungu-options" class="absolute left-0 top-full mt-2 w-full bg-white border border-outline-variant/20 rounded-2xl shadow-lg max-h-60 overflow-y-auto z-50 hidden transition-all duration-150 py-1">
+            </ul>
+          </div>
+
+          <!-- 행정구(구·군) 커스텀 드롭다운 (상세구 존재 시 자동 활성화) -->
+          <div class="relative w-full sm:flex-1 dropdown-container hidden" id="pref-detail-dropdown-container">
+            <button id="btn-pref-detail-dropdown" type="button" class="w-full bg-surface border border-outline-variant/40 text-on-surface rounded-full py-2.5 pl-10 pr-4 focus:ring-2 focus:ring-primary-container focus:border-primary-container text-sm font-medium text-left flex items-center justify-between cursor-not-allowed opacity-50" disabled>
+              <span id="text-pref-detail-selected" class="truncate text-secondary">구 선택</span>
+              <span class="material-symbols-outlined text-secondary text-lg">arrow_drop_down</span>
+            </button>
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary text-xl pointer-events-none">location_city</span>
+            <ul id="list-pref-detail-options" class="absolute left-0 top-full mt-2 w-full bg-white border border-outline-variant/20 rounded-2xl shadow-lg max-h-60 overflow-y-auto z-50 hidden transition-all duration-150 py-1">
+            </ul>
+          </div>
         </div>
 
         <!-- 지도 -->
@@ -164,7 +196,7 @@ export async function renderPreferredRegionPage(container) {
 
         <!-- 하단 액션 바 -->
         <div class="flex flex-col sm:flex-row justify-between items-center bg-white p-4 border border-outline-variant/30 rounded-card shadow-soft gap-4">
-          <p id="map-status-msg" class="text-sm text-secondary">주소를 입력하거나 지도의 핀을 드래그하여 자주 활동하시는 선호위치를 확정해 주세요.</p>
+          <p id="map-status-msg" class="text-sm text-secondary">주소 대신 드롭다운 메뉴로 대략적인 선호 활동 지역을 지정해 주세요.</p>
           <button id="btn-confirm-location" class="btn-primary py-2.5 px-6 rounded-full text-sm font-bold flex items-center gap-2 shadow-md shrink-0">
             <span class="material-symbols-outlined text-sm">favorite</span>
             <span>선호위치 등록</span>
@@ -210,6 +242,247 @@ export async function renderPreferredRegionPage(container) {
     }
   })
 
+  // Dropdown References
+  const btnSido = document.querySelector('#btn-pref-sido-dropdown')
+  const textSido = document.querySelector('#text-pref-sido-selected')
+  const listSido = document.querySelector('#list-pref-sido-options')
+
+  const btnSigungu = document.querySelector('#btn-pref-sigungu-dropdown')
+  const textSigungu = document.querySelector('#text-pref-sigungu-selected')
+  const listSigungu = document.querySelector('#list-pref-sigungu-options')
+
+  const btnDetail = document.querySelector('#btn-pref-detail-dropdown')
+  const textDetail = document.querySelector('#text-pref-detail-selected')
+  const listDetail = document.querySelector('#list-pref-detail-options')
+  const detailContainer = document.querySelector('#pref-detail-dropdown-container')
+
+  let lastValidSido = initialSido
+  let lastValidSigungu = initialSigungu
+  let lastValidDetail = initialDetail
+  let currentRegionCode = ''
+  let currentRegionName = initialLocName
+
+  const updateSidoText = (val) => {
+    lastValidSido = val
+    if (textSido) {
+      textSido.textContent = val
+      textSido.classList.remove('text-secondary')
+      textSido.classList.add('text-on-surface', 'font-semibold')
+    }
+  }
+
+  const updateSigunguText = (val) => {
+    lastValidSigungu = val
+    if (textSigungu) {
+      textSigungu.textContent = val
+      textSigungu.classList.remove('text-secondary')
+      textSigungu.classList.add('text-on-surface', 'font-semibold')
+    }
+  }
+
+  const updateDetailText = (val) => {
+    lastValidDetail = val
+    if (textDetail) {
+      textDetail.textContent = val || '구 선택'
+      if (val) {
+        textDetail.classList.remove('text-secondary')
+        textDetail.classList.add('text-on-surface', 'font-semibold')
+      } else {
+        textDetail.classList.remove('text-on-surface', 'font-semibold')
+        textDetail.classList.add('text-secondary')
+      }
+    }
+  }
+
+  const populateSigunguOptions = (s) => {
+    if (!listSigungu || !regionTree[s]) return
+    listSigungu.innerHTML = ''
+    Object.keys(regionTree[s]).forEach(sigunguName => {
+      const li = document.createElement('li')
+      li.className = 'px-4 py-2.5 text-sm hover:bg-primary-container/10 hover:text-primary-container cursor-pointer transition-colors text-on-surface'
+      li.textContent = sigunguName
+      li.addEventListener('click', () => selectSigungu(sigunguName))
+      listSigungu.appendChild(li)
+    })
+  }
+
+  const populateDetailOptions = (sig) => {
+    if (!listDetail) return
+    listDetail.innerHTML = ''
+    const node = regionTree[lastValidSido][sig]
+    if (node) {
+      Object.keys(node).forEach(detName => {
+        const li = document.createElement('li')
+        li.className = 'px-4 py-2.5 text-sm hover:bg-primary-container/10 hover:text-primary-container cursor-pointer transition-colors text-on-surface'
+        li.textContent = detName
+        li.addEventListener('click', () => selectDetail(detName))
+        listDetail.appendChild(li)
+      })
+    }
+  }
+
+  // Map Instance references
+  let mapInstance = null
+  let markerInstance = null
+
+  const moveMapToRegion = (lat, lng, labelText) => {
+    if (mapInstance && markerInstance) {
+      const moveLatLng = new window.kakao.maps.LatLng(lat, lng)
+      mapInstance.setCenter(moveLatLng)
+      markerInstance.setPosition(moveLatLng)
+      
+      const labelLoc = document.getElementById('text-current-location')
+      if (labelLoc) {
+        labelLoc.textContent = labelText
+      }
+      const statusMsg = document.getElementById('map-status-msg')
+      if (statusMsg) {
+        statusMsg.innerHTML = `선택된 선호지역: <strong>${labelText}</strong> (위도: ${lat.toFixed(4)}, 경도: ${lng.toFixed(4)})`
+      }
+    }
+  }
+
+  const selectSido = (s) => {
+    updateSidoText(s)
+    updateSigunguText('시·군·구 선택')
+    updateDetailText('')
+    if (detailContainer) detailContainer.classList.add('hidden')
+    
+    if (btnSigungu) {
+      btnSigungu.disabled = false
+      btnSigungu.classList.remove('cursor-not-allowed', 'opacity-50')
+      btnSigungu.classList.add('cursor-pointer')
+    }
+    populateSigunguOptions(s)
+    listSido?.classList.add('hidden')
+    currentRegionCode = ''
+    currentRegionName = ''
+  }
+
+  const selectSigungu = (sig) => {
+    updateSigunguText(sig)
+    listSigungu?.classList.add('hidden')
+    
+    const node = regionTree[lastValidSido][sig]
+    const hasDetail = node && !node.code
+
+    if (hasDetail) {
+      if (detailContainer) detailContainer.classList.remove('hidden')
+      if (btnDetail) {
+        btnDetail.disabled = false
+        btnDetail.classList.remove('cursor-not-allowed', 'opacity-50')
+        btnDetail.classList.add('cursor-pointer')
+      }
+      updateDetailText('')
+      populateDetailOptions(sig)
+      currentRegionCode = ''
+      currentRegionName = ''
+    } else {
+      if (detailContainer) detailContainer.classList.add('hidden')
+      updateDetailText('')
+      
+      if (node) {
+        currentRegionCode = node.code
+        currentRegionName = node.fullName
+        moveMapToRegion(node.lat, node.lng, node.fullName)
+      }
+    }
+  }
+
+  const selectDetail = (det) => {
+    updateDetailText(det)
+    listDetail?.classList.add('hidden')
+
+    const node = regionTree[lastValidSido][lastValidSigungu]
+    const targetRegion = node ? node[det] : null
+
+    if (targetRegion) {
+      currentRegionCode = targetRegion.code
+      currentRegionName = targetRegion.fullName
+      moveMapToRegion(targetRegion.lat, targetRegion.lng, targetRegion.fullName)
+    }
+  }
+
+  // Populate initial options
+  if (listSido) {
+    listSido.innerHTML = ''
+    Object.keys(regionTree).forEach(sidoName => {
+      const li = document.createElement('li')
+      li.className = 'px-4 py-2.5 text-sm hover:bg-primary-container/10 hover:text-primary-container cursor-pointer transition-colors text-on-surface'
+      li.textContent = sidoName
+      li.addEventListener('click', () => selectSido(sidoName))
+      listSido.appendChild(li)
+    })
+  }
+
+  // Setup dropdown values from initial state
+  if (initialSido) {
+    updateSidoText(initialSido)
+    if (btnSigungu) {
+      btnSigungu.disabled = false
+      btnSigungu.classList.remove('cursor-not-allowed', 'opacity-50')
+      btnSigungu.classList.add('cursor-pointer')
+    }
+    populateSigunguOptions(initialSido)
+  }
+  if (initialSigungu) {
+    updateSigunguText(initialSigungu)
+    
+    const node = regionTree[initialSido]?.[initialSigungu]
+    const hasDetail = node && !node.code
+    if (hasDetail) {
+      if (detailContainer) detailContainer.classList.remove('hidden')
+      if (btnDetail) {
+        btnDetail.disabled = false
+        btnDetail.classList.remove('cursor-not-allowed', 'opacity-50')
+        btnDetail.classList.add('cursor-pointer')
+      }
+      populateDetailOptions(initialSigungu)
+      if (initialDetail) {
+        updateDetailText(initialDetail)
+      }
+    }
+    
+    if (node) {
+      const target = initialDetail ? node[initialDetail] : node
+      if (target) {
+        currentRegionCode = target.code
+      }
+    }
+  }
+
+  btnSido?.addEventListener('click', (e) => {
+    e.stopPropagation()
+    listSido?.classList.toggle('hidden')
+    listSigungu?.classList.add('hidden')
+    listDetail?.classList.add('hidden')
+  })
+
+  btnSigungu?.addEventListener('click', (e) => {
+    e.stopPropagation()
+    if (lastValidSido) {
+      listSigungu?.classList.toggle('hidden')
+      listSido?.classList.add('hidden')
+      listDetail?.classList.add('hidden')
+    }
+  })
+
+  btnDetail?.addEventListener('click', (e) => {
+    e.stopPropagation()
+    if (lastValidSido && lastValidSigungu) {
+      listDetail?.classList.toggle('hidden')
+      listSido?.classList.add('hidden')
+      listSigungu?.classList.add('hidden')
+    }
+  })
+
+  document.addEventListener('click', () => {
+    listSido?.classList.add('hidden')
+    listSigungu?.classList.add('hidden')
+    listDetail?.classList.add('hidden')
+  })
+
+  // Map Initialization
   const initPreferredLocationMap = (initLat, initLng) => {
     const checkKakao = setInterval(() => {
       if (window.kakao && window.kakao.maps) {
@@ -226,20 +499,20 @@ export async function renderPreferredRegionPage(container) {
           const map = new window.kakao.maps.Map(mapContainer, options)
           const marker = new window.kakao.maps.Marker({
             position: new window.kakao.maps.LatLng(initLat, initLng),
-            draggable: true
+            draggable: false // 대략적인 위치 지정이므로 핀 드래그 불필요
           })
           marker.setMap(map)
+          map.setDraggable(false) // 드래그로 지도 이동 차단
+          map.setZoomable(false)    // 휠 스크롤을 통한 지도 줌(확대/축소) 차단
+
+          mapInstance = map
+          markerInstance = marker
 
           // Force map relayout after layout rendering is complete to avoid off-center issue
           setTimeout(() => {
             map.relayout()
             map.setCenter(new window.kakao.maps.LatLng(initLat, initLng))
           }, 150)
-
-          const geocoder = new window.kakao.maps.services.Geocoder()
-          let currentPosition = marker.getPosition()
-          let currentRegionCode = ''
-          let currentRegionName = ''
 
           function readCookie(name) {
             const prefix = `${encodeURIComponent(name)}=`
@@ -249,109 +522,10 @@ export async function renderPreferredRegionPage(container) {
             return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null
           }
 
-          const updateUIForPosition = (position) => {
-            currentPosition = position
-            geocoder.coord2RegionCode(position.getLng(), position.getLat(), (result, status) => {
-              if (status === window.kakao.maps.services.Status.OK) {
-                const regionInfo = result.find(r => r.region_type === 'H')
-                if (!regionInfo) return
-
-                const newSido = regionInfo.region_1depth_name
-                const rawSigungu = regionInfo.region_2depth_name
-
-                let searchSido = newSido
-                if (newSido === '광주광역시' || newSido === '전라남도') {
-                  searchSido = '전남광주통합특별시'
-                }
-
-                const spaceIdx = rawSigungu.indexOf(' ')
-                let parentSigungu = rawSigungu
-                let childDetail = ''
-                if (spaceIdx > 0) {
-                  parentSigungu = rawSigungu.substring(0, spaceIdx)
-                  childDetail = rawSigungu.substring(spaceIdx + 1)
-                }
-
-                const sidoNode = regionTree[searchSido]
-                const sigunguNode = sidoNode ? sidoNode[parentSigungu] : null
-
-                let matchedRegion = null
-                let finalDetail = ''
-                if (sigunguNode) {
-                  if (childDetail && sigunguNode[childDetail]) {
-                    matchedRegion = sigunguNode[childDetail]
-                    finalDetail = childDetail
-                  } else if (!childDetail && sigunguNode.code) {
-                    matchedRegion = sigunguNode
-                  }
-                }
-
-                if (matchedRegion) {
-                  currentRegionCode = matchedRegion.code
-                  currentRegionName = matchedRegion.fullName
-
-                  const labelLoc = document.getElementById('text-current-location')
-                  if (labelLoc) {
-                    labelLoc.textContent = matchedRegion.fullName
-                  }
-                  const statusMsg = document.getElementById('map-status-msg')
-                  if (statusMsg) {
-                    statusMsg.innerHTML = `선택된 선호지역: <strong>${matchedRegion.fullName}</strong> (위도: ${position.getLat().toFixed(4)}, 경도: ${position.getLng().toFixed(4)})`
-                  }
-                } else {
-                  marker.setPosition(currentPosition)
-                  alert(`선택하신 위치(${newSido} ${rawSigungu})는 현재 서비스 지원 지역이 아닙니다.`)
-                }
-              }
-            })
-          }
-
-          updateUIForPosition(currentPosition)
-
-          window.kakao.maps.event.addListener(map, 'click', (mouseEvent) => {
-            const clickedPos = mouseEvent.latLng
-            marker.setPosition(clickedPos)
-            updateUIForPosition(clickedPos)
-          })
-
-          window.kakao.maps.event.addListener(marker, 'dragend', () => {
-            updateUIForPosition(marker.getPosition())
-          })
-
-          const addressInput = document.getElementById('input-preferred-address')
-          const searchBtn = document.getElementById('btn-search-address')
-
-          const executeAddressSearch = () => {
-            const address = addressInput.value.trim()
-            if (!address) {
-              alert('검색할 주소를 입력해 주세요.')
-              return
-            }
-
-            geocoder.addressSearch(address, (result, status) => {
-              if (status === window.kakao.maps.services.Status.OK) {
-                const coords = new window.kakao.maps.LatLng(result[0].y, result[0].x)
-                map.relayout() // Force relayout to update container dimensions
-                map.setCenter(coords)
-                marker.setPosition(coords)
-                updateUIForPosition(coords)
-              } else {
-                alert('입력하신 주소를 찾을 수 없습니다. 정확한 도로명/지번 주소를 입력해 주세요.')
-              }
-            })
-          }
-
-          searchBtn?.addEventListener('click', executeAddressSearch)
-          addressInput?.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-              executeAddressSearch()
-            }
-          })
-
           const confirmBtn = document.getElementById('btn-confirm-location')
           confirmBtn?.addEventListener('click', async () => {
             if (!currentRegionCode || !currentRegionName) {
-              alert('선택된 유효한 행정구역이 없습니다. 지도를 클릭하거나 주소를 검색해 주세요.')
+              alert('시·도, 시·군·구를 모두 선택해 주세요.')
               return
             }
 

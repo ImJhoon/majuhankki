@@ -498,7 +498,7 @@ function initKakaoMap(lat, lng, name, sido, sigungu, detail) {
         const markerPosition = new window.kakao.maps.LatLng(lat, lng)
         const marker = new window.kakao.maps.Marker({
           position: markerPosition,
-          draggable: true
+          draggable: false
         })
         
         marker.setMap(map)
@@ -600,15 +600,20 @@ function initKakaoMap(lat, lng, name, sido, sigungu, detail) {
           })
         }
         
-        // Marker dragend event
-        window.kakao.maps.event.addListener(marker, 'dragend', () => {
-          handlePinMove(marker.getPosition())
+        // 지도가 움직일 때 마커의 위치를 지도의 정중앙에 고정
+        window.kakao.maps.event.addListener(map, 'center_changed', () => {
+          marker.setPosition(map.getCenter())
+        })
+
+        // 지도 드래그가 끝났을 때만 행정동 변환 API(handlePinMove) 호출하여 자원 절약
+        window.kakao.maps.event.addListener(map, 'dragend', () => {
+          handlePinMove(map.getCenter())
         })
 
         // Map click event
         window.kakao.maps.event.addListener(map, 'click', (mouseEvent) => {
           const latlng = mouseEvent.latLng
-          marker.setPosition(latlng)
+          map.panTo(latlng) // 지도를 클릭한 위치로 부드럽게 이동
           handlePinMove(latlng)
         })
 
