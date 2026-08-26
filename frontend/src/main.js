@@ -2,21 +2,101 @@ import './style.css'
 import { startKakaoLogin, startGoogleLogin, login, logout, signUp } from './auth/auth-api.js'
 import { clearAccessToken, getAccessToken } from './auth/token-storage.js'
 import { renderOAuthCallback } from './pages/oauth-callback.js'
+import { renderPreferredRegionPage } from './pages/preferred-region.js'
+import { renderMatchMapPage } from './pages/match-map.js'
 
 const app = document.querySelector('#app')
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080').replace(/\/$/, '')
-let regionData = {}
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080').replace(/\/$/, '')
 
-if (window.location.pathname === '/oauth/callback') {
-  renderOAuthCallback(app)
-} else if (window.location.pathname === '/profile/setup') {
-  renderProfileSetup(app)
-} else if (window.location.pathname === '/map') {
-  renderMapPage(app)
-} else {
-  initLandingPage()
+// 행정구역 트리 (pages/ 모듈과 공유)
+export let regionTree = {}
+
+// Toast 헬퍼 (pages/ 모듈과 공유)
+export function showToast(message) {
+  const existing = document.querySelector('#toast-message')
+  if (existing) existing.remove()
+
+  const toast = document.createElement('div')
+  toast.id = 'toast-message'
+  toast.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 bg-brand-navy text-white px-6 py-3.5 rounded-full text-xs sm:text-sm font-bold shadow-floating z-50 animate-bounce flex items-center gap-2 border border-white/10'
+  toast.innerHTML = `
+    <span class="material-symbols-outlined text-primary-container text-base sm:text-lg">warning</span>
+    <span>${message}</span>
+  `
+  document.body.appendChild(toast)
+
+  setTimeout(() => {
+    toast.classList.add('opacity-0', 'transition-opacity', 'duration-500')
+    setTimeout(() => toast.remove(), 500)
+  }, 2500)
 }
+
+// 행정구역 데이터 로드 (Backend API → regionTree 구성)
+const loadRegions = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/regions?level=GU`)
+    const body = await response.json()
+    if (body.success && body.data) {
+      regionTree = {}
+      body.data.forEach(r => {
+        const parts = r.regionName.split(' ')
+        const sido = parts[0]
+        const sigungu = parts[1]
+        const detail = parts[2] || ''
+
+        if (!regionTree[sido]) {
+          regionTree[sido] = {}
+        }
+
+        if (detail) {
+          if (!regionTree[sido][sigungu]) {
+            regionTree[sido][sigungu] = {}
+          }
+          regionTree[sido][sigungu][detail] = {
+            code: r.regionCode,
+            name: detail,
+            fullName: r.regionName,
+            lat: r.centerLatitude,
+            lng: r.centerLongitude
+          }
+        } else {
+          regionTree[sido][sigungu] = {
+            code: r.regionCode,
+            name: sigungu,
+            fullName: r.regionName,
+            lat: r.centerLatitude,
+            lng: r.centerLongitude
+          }
+        }
+      })
+    }
+  } catch (err) {
+    console.error('행정구역 데이터를 가져오는데 실패했습니다.', err)
+  }
+}
+
+// 라우터 및 앱 초기화
+const initApp = async () => {
+  await loadRegions()
+
+  if (window.location.pathname === '/oauth/callback') {
+    renderOAuthCallback(app)
+  } else if (window.location.pathname === '/profile/setup') {
+    renderProfileSetup(app)
+  } else if (window.location.pathname === '/map') {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('mode') === 'preferred') {
+      await renderPreferredRegionPage(app)
+    } else {
+      await renderMatchMapPage(app)
+    }
+  } else {
+    initLandingPage()
+  }
+}
+
+initApp()
 
 function initLandingPage() {
   const token = getAccessToken()
@@ -24,18 +104,9 @@ function initLandingPage() {
   const btnHeaderLogin = document.querySelector('#btn-header-login')
   const btnHeaderStart = document.querySelector('#btn-header-start')
   const btnHeroMatch = document.querySelector('#btn-hero-match')
+  const btnRegisterPreferred = document.querySelector('#btn-register-preferred')
   const btnCtaStart = document.querySelector('#btn-cta-start')
   const btnPreviewJoin = document.querySelector('#btn-preview-join')
-  const btnSido = document.querySelector('#btn-sido-dropdown')
-  const textSido = document.querySelector('#text-sido-selected')
-  const listSido = document.querySelector('#list-sido-options')
-
-  const btnSigungu = document.querySelector('#btn-sigungu-dropdown')
-  const textSigungu = document.querySelector('#text-sigungu-selected')
-  const listSigungu = document.querySelector('#list-sigungu-options')
-
-  let selectedSido = ''
-  let selectedSigungu = ''
 
   // Auth Modal Elements
   const authModal = document.querySelector('#auth-modal')
@@ -57,13 +128,22 @@ function initLandingPage() {
     } else {
       showLoginForm()
     }
-    authModal?.classList.add('is-open')
-    authModal?.setAttribute('aria-hidden', 'false')
+    if (authModal) {
+      authModal.style.display = 'grid'
+      authModal.offsetHeight // Force reflow
+      authModal.classList.add('is-open')
+      authModal.setAttribute('aria-hidden', 'false')
+    }
   }
 
   const closeAuthModal = () => {
-    authModal?.classList.remove('is-open')
-    authModal?.setAttribute('aria-hidden', 'true')
+    if (authModal) {
+      authModal.classList.remove('is-open')
+      authModal.setAttribute('aria-hidden', 'true')
+      setTimeout(() => {
+        authModal.style.display = 'none'
+      }, 250)
+    }
     if (loginErrorMsg) loginErrorMsg.style.display = 'none'
     if (signupErrorMsg) signupErrorMsg.style.display = 'none'
   }
@@ -84,7 +164,7 @@ function initLandingPage() {
     if (signupErrorMsg) signupErrorMsg.style.display = 'none'
   }
 
-  // Header Logged-In vs Logged-Out UI
+  // 로그인 상태에 따른 헤더 UI
   if (token && headerAuth) {
     headerAuth.innerHTML = `
       <div class="flex items-center gap-3">
@@ -92,27 +172,61 @@ function initLandingPage() {
           <span class="w-1.5 h-1.5 rounded-full bg-success"></span>
           로그인 됨
         </span>
+        <button id="btn-revoke-location" class="btn-secondary px-4 py-2 rounded-full text-xs sm:text-sm font-semibold text-error hover:bg-error/10 hover:text-error border-error/30 flex items-center gap-1">
+          <span class="material-symbols-outlined text-sm">no_accounts</span>
+          <span>위치동의 철회</span>
+        </button>
         <button id="btn-logout" class="btn-secondary px-4 py-2 rounded-full text-xs sm:text-sm font-semibold">
           로그아웃
         </button>
       </div>
     `
-    document.querySelector('#btn-logout')?.addEventListener('click', async () => {
-      try {
-        await logout()
-        clearAccessToken()
-        window.location.reload()
-      } catch (error) {
-        console.error('로그아웃 요청 실패:', error)
-        alert(error.message || '로그아웃에 실패했습니다. 잠시 후 다시 시도해 주세요.')
+    document.querySelector('#btn-revoke-location')?.addEventListener('click', async () => {
+      if (confirm('위치 정보 이용 동의를 철회하시겠습니까?\n철회 시 등록된 선호위치와 대기 중인 모든 매칭 요청이 파기됩니다.')) {
+        try {
+          const csrfResp = await fetch(`${API_BASE_URL}/auth/csrf`, { credentials: 'include' })
+          if (!csrfResp.ok) throw new Error('CSRF 토큰 발급에 실패했습니다.')
+
+          const readCookie = (name) => {
+            const prefix = `${encodeURIComponent(name)}=`
+            const cookie = document.cookie
+              .split('; ')
+              .find((item) => item.startsWith(prefix))
+            return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null
+          }
+          const csrfToken = readCookie('XSRF-TOKEN')
+
+          const resp = await fetch(`${API_BASE_URL}/users/me/preferred-region`, {
+            method: 'DELETE',
+            credentials: 'include',
+            headers: {
+              'X-XSRF-TOKEN': csrfToken
+            }
+          })
+
+          if (resp.ok) {
+            alert('위치 정보 이용 동의가 철회되고 데이터가 영구 파기되었습니다.')
+            window.location.reload()
+          } else {
+            alert('동의 철회 처리에 실패했습니다.')
+          }
+        } catch (err) {
+          alert('오류가 발생했습니다: ' + err.message)
+        }
       }
+    })
+
+    document.querySelector('#btn-logout')?.addEventListener('click', async () => {
+      await logout()
+      clearAccessToken()
+      window.location.reload()
     })
   } else {
     btnHeaderLogin?.addEventListener('click', () => openAuthModal(false))
     btnHeaderStart?.addEventListener('click', () => openAuthModal(false))
   }
 
-  // Modal Close Events
+  // 모달 닫기
   btnCloseModal?.addEventListener('click', closeAuthModal)
   authModal?.addEventListener('click', (e) => {
     if (e.target === authModal) {
@@ -120,15 +234,15 @@ function initLandingPage() {
     }
   })
 
-  // Switch between Login & Signup
+  // 로그인 ↔ 회원가입 전환
   btnToggleSignup?.addEventListener('click', showSignupForm)
   btnToggleLogin?.addEventListener('click', showLoginForm)
 
-  // Social Login Triggers
+  // 소셜 로그인
   btnModalKakao?.addEventListener('click', startKakaoLogin)
   btnModalGoogle?.addEventListener('click', startGoogleLogin)
 
-  // Local Login Submit
+  // 이메일 로그인 제출
   formLogin?.addEventListener('submit', async (e) => {
     e.preventDefault()
     const email = document.querySelector('#login-email')?.value.trim()
@@ -147,7 +261,7 @@ function initLandingPage() {
     }
   })
 
-  // Local Signup Submit
+  // 이메일 회원가입 제출
   formSignup?.addEventListener('submit', async (e) => {
     e.preventDefault()
     const email = document.querySelector('#signup-email')?.value.trim()
@@ -157,7 +271,6 @@ function initLandingPage() {
 
     try {
       await signUp(email, password, nickname)
-      // 회원가입 성공 후 자동 로그인 시도
       await login(email, password)
       closeAuthModal()
       window.location.reload()
@@ -169,147 +282,29 @@ function initLandingPage() {
     }
   })
 
-  // Toggle Sido dropdown visibility
-  btnSido?.addEventListener('click', (e) => {
-    e.stopPropagation()
-    listSido?.classList.toggle('hidden')
-    listSigungu?.classList.add('hidden')
-  })
-
-  // Toggle Sigungu dropdown visibility
-  btnSigungu?.addEventListener('click', (e) => {
-    e.stopPropagation()
-    if (selectedSido) {
-      listSigungu?.classList.toggle('hidden')
-      listSido?.classList.add('hidden')
-    }
-  })
-
-  // Close dropdowns when clicking outside
-  document.addEventListener('click', () => {
-    listSido?.classList.add('hidden')
-    listSigungu?.classList.add('hidden')
-  })
-
-  // Populate Sido dropdown options
-  const populateSidoOptions = () => {
-    if (!listSido) return
-    listSido.innerHTML = ''
-    Object.keys(regionData).forEach(sido => {
-      const li = document.createElement('li')
-      li.className = 'px-4 py-2.5 text-sm hover:bg-primary-container/10 hover:text-primary-container cursor-pointer transition-colors text-on-surface'
-      li.textContent = sido
-      li.addEventListener('click', () => selectSido(sido))
-      listSido.appendChild(li)
-    })
-  }
-
-  // Handle Sido selection
-  const selectSido = (sido) => {
-    selectedSido = sido
-    if (textSido) {
-      textSido.textContent = sido
-      textSido.classList.remove('text-secondary')
-      textSido.classList.add('text-on-surface', 'font-semibold')
-    }
-    
-    // Reset Sigungu
-    selectedSigungu = ''
-    if (textSigungu) {
-      textSigungu.textContent = '시·군·구 선택'
-      textSigungu.classList.remove('text-on-surface', 'font-semibold')
-      textSigungu.classList.add('text-secondary')
-    }
-
-    // Enable Sigungu dropdown button
-    if (btnSigungu) {
-      btnSigungu.disabled = false
-      btnSigungu.classList.remove('cursor-not-allowed', 'opacity-50')
-      btnSigungu.classList.add('cursor-pointer')
-    }
-
-    // Populate Sigungu list
-    if (listSigungu && regionData[sido]) {
-      listSigungu.innerHTML = ''
-      regionData[sido].forEach(region => {
-        const li = document.createElement('li')
-        li.className = 'px-4 py-2.5 text-sm hover:bg-primary-container/10 hover:text-primary-container cursor-pointer transition-colors text-on-surface'
-        li.textContent = region.name
-        li.addEventListener('click', () => selectSigungu(region.name))
-        listSigungu.appendChild(li)
-      })
-    }
-
-    listSido?.classList.add('hidden')
-  }
-
-  // Handle Sigungu selection
-  const selectSigungu = (sigungu) => {
-    selectedSigungu = sigungu
-    if (textSigungu) {
-      textSigungu.textContent = sigungu
-      textSigungu.classList.remove('text-secondary')
-      textSigungu.classList.add('text-on-surface', 'font-semibold')
-    }
-    listSigungu?.classList.add('hidden')
-  }
-
-  // Populate Sido dropdown by loading regions dynamically from Backend API
-  const loadRegions = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/regions?level=GU`)
-      const body = await response.json()
-      if (body.success && body.data) {
-        regionData = {}
-        body.data.forEach(r => {
-          const parts = r.regionName.split(' ')
-          const sido = parts[0]
-          const sigungu = parts[1] || r.regionName
-          
-          if (!regionData[sido]) {
-            regionData[sido] = []
-          }
-          regionData[sido].push({
-            name: sigungu,
-            lat: r.centerLatitude,
-            lng: r.centerLongitude
-          })
-        })
-        
-        populateSidoOptions()
-      }
-    } catch (err) {
-      console.error('행정구역 데이터를 가져오는데 실패했습니다.', err)
-    }
-  }
-
-  loadRegions()
-
-  // Hero Quick Match Button
+  // 히어로 매칭 시작 버튼
   const handleMatchStart = () => {
     if (!token) {
       openAuthModal(false)
       return
     }
-    if (selectedSido && selectedSigungu) {
-      const targetList = regionData[selectedSido] || []
-      const region = targetList.find(r => r.name === selectedSigungu)
-      if (region) {
-        window.location.assign(`/map?lat=${region.lat}&lng=${region.lng}&name=${encodeURIComponent(region.name)}`)
-      }
-    } else {
-      alert('활동 지역(시·도 및 시·군·구)을 모두 선택해 주세요.')
-      btnSido?.focus()
-    }
+    window.location.assign('/map')
   }
 
   btnHeroMatch?.addEventListener('click', handleMatchStart)
+
+  if (sessionStorage.getItem('project2.isLoggedIn') === 'true') {
+    btnRegisterPreferred?.classList.remove('hidden')
+  }
+  btnRegisterPreferred?.addEventListener('click', () => {
+    window.location.assign('/map?mode=preferred')
+  })
+
   btnCtaStart?.addEventListener('click', () => {
     if (!token) {
       openAuthModal(false)
     } else {
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-      btnSido?.focus()
+      window.location.assign('/map')
     }
   })
   btnPreviewJoin?.addEventListener('click', () => {
@@ -337,93 +332,4 @@ function renderProfileSetup(container) {
       </section>
     </main>
   `
-}
-
-function renderMapPage(container) {
-  const params = new URLSearchParams(window.location.search)
-  const lat = parseFloat(params.get('lat')) || 37.5662
-  const lng = parseFloat(params.get('lng')) || 126.9016
-  const name = params.get('name') || '마포구'
-
-  container.innerHTML = `
-    <main class="max-w-[1440px] mx-auto px-margin-mobile md:px-margin-desktop py-8 flex flex-col gap-6 w-full">
-      <!-- 타이틀 바 -->
-      <div class="flex items-center justify-between border-b border-outline-variant/30 pb-4">
-        <div>
-          <h1 class="font-headline text-2xl font-bold text-brand-navy">마주한끼 찾기</h1>
-          <p class="text-sm text-secondary">선택한 지역: <strong class="text-primary-container">${name}</strong></p>
-        </div>
-        <a href="/" class="btn-secondary px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-1">
-          <span class="material-symbols-outlined text-lg">home</span>
-          <span>홈으로</span>
-        </a>
-      </div>
-
-      <!-- 지도 및 컨트롤 영역 (가로 너비 max-w-[1440px] 제한, 세로 높이 450px 컴팩트화) -->
-      <div class="w-full flex flex-col gap-4">
-        <div class="w-full bg-white border border-outline-variant/30 rounded-card shadow-soft overflow-hidden" id="map" style="height: 450px; min-height: 450px;">
-          <!-- 카카오맵이 여기에 렌더링됩니다. -->
-        </div>
-
-        <!-- 하단 액션 바 -->
-        <div class="flex justify-end">
-          <button id="btn-confirm-location" class="btn-primary py-2.5 px-6 rounded-full text-sm font-bold flex items-center gap-2 shadow-md">
-            <span class="material-symbols-outlined text-sm">check_circle</span>
-            <span>이 위치로 핀 확정 테스트</span>
-          </button>
-        </div>
-      </div>
-    </main>
-  `
-
-  initKakaoMap(lat, lng, name)
-}
-
-function initKakaoMap(lat, lng, name) {
-  const checkKakao = setInterval(() => {
-    if (window.kakao && window.kakao.maps) {
-      clearInterval(checkKakao)
-      
-      // Kakao Maps SDK 내부의 비동기 리소스 로딩이 완전히 완료된 시점에 호출을 보장합니다.
-      window.kakao.maps.load(() => {
-        const container = document.getElementById('map')
-        if (!container) return
-
-        const options = {
-          center: new window.kakao.maps.LatLng(lat, lng),
-          level: 4
-        }
-        
-        const map = new window.kakao.maps.Map(container, options)
-        
-        // 드래그 가능한 마커 생성
-        const markerPosition = new window.kakao.maps.LatLng(lat, lng)
-        const marker = new window.kakao.maps.Marker({
-          position: markerPosition,
-          draggable: true
-        })
-        
-        marker.setMap(map)
-        
-        // 마커 드래그 시 좌표 로깅
-        window.kakao.maps.event.addListener(marker, 'dragend', () => {
-          const position = marker.getPosition()
-          console.log(`변경된 위치 좌표: Lat=${position.getLat()}, Lng=${position.getLng()}`)
-        })
-
-        // 지도 클릭 시 마커 이동
-        window.kakao.maps.event.addListener(map, 'click', (mouseEvent) => {
-          const latlng = mouseEvent.latLng
-          marker.setPosition(latlng)
-          console.log(`클릭한 위치 좌표: Lat=${latlng.getLat()}, Lng=${latlng.getLng()}`)
-        })
-
-        // 핀 확정 버튼 이벤트
-        document.querySelector('#btn-confirm-location')?.addEventListener('click', () => {
-          const finalPos = marker.getPosition()
-          alert(`[${name}] 핀 위치 확정!\n위도: ${finalPos.getLat()}\n경도: ${finalPos.getLng()}`)
-        })
-      })
-    }
-  }, 100)
 }
