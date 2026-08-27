@@ -88,27 +88,29 @@
 
 ## 2. 상대방 선호 중요도 API
 
-- [ ] `UserMatchingPreferenceRepository`를 구현한다.
-- [ ] 네 가지 `PersonalityDimension`의 누락·중복을 거절하는 요청 DTO를 구현한다.
-- [ ] `importance`는 `0~5`, `mode`는 `SIMILAR`/`COMPLEMENTARY`만 허용한다.
-- [ ] `GET /users/me/matching-preferences`를 구현한다.
-- [ ] `PUT /users/me/matching-preferences`를 전체 교체 방식의 단일 트랜잭션으로 구현한다.
-- [ ] JWT 사용자 UUID로 본인 선호만 조회·수정하고 변경 요청에 CSRF 검증을 적용한다.
-- [ ] 선호가 없는 사용자를 위한 서버 기본값 또는 성향 점수 미적용 정책을 확정한다.
+- [x] 상대방 선호는 성향 조사 결과가 아니라 매칭 시작 전 조건이므로 관련 코드를 `matching` 도메인에 배치하고, `controller/preference`, `service/preference`, `dto/preference`, `exception/preference`로 책임을 분리한다.
+- [x] `UserMatchingPreferenceRepository`를 구현한다.
+- [x] 네 가지 `PersonalityDimension`의 누락·중복을 거절하는 요청 DTO를 구현한다.
+- [x] `importance`는 `0~5`, `mode`는 `SIMILAR`/`COMPLEMENTARY`만 허용한다.
+- [x] `GET /users/me/matching-preferences`를 구현한다.
+- [x] `PUT /users/me/matching-preferences`를 전체 교체 방식의 단일 트랜잭션으로 구현한다.
+- [x] JWT 사용자 UUID로 본인 선호만 조회·수정하고 변경 요청에 CSRF 검증을 적용한다.
+- [x] 선호 미설정 시 빈 목록을 반환하고 사용자별 성향 차원 점수를 적용하지 않는 정책으로 확정한다.
 
 ## 3. 실시간 매칭 요청 API
 
-- [ ] 매칭 요청 DTO에 음식 카테고리, 식사 일시, 구 코드, 핀 위경도, 장소명, 탐색 반경, 희망 태그와 선택형 희망 설명을 포함한다.
-- [ ] 구 코드·표시명을 서버 기준 데이터로 정규화한다.
-- [ ] 핀이 선택한 구에 속하는지 검증하고 Point를 경도·위도 순서로 생성한다.
-- [ ] 위치 서비스 동의가 없으면 요청을 거절한다.
-- [ ] 동일 사용자의 활성 `WAITING` 요청을 원자적으로 차단한다.
-- [ ] 요청 생성 시 현재 매칭 선호를 `preference_snapshot`으로 복사한다.
-- [ ] 요청 생성 시 `matching_formula_version=PERSONALITY_MATCH_V1`을 저장한다.
-- [ ] `desiredPersonalityTags`와 `desiredPersonalityText`를 요청 Entity에 반영한다.
-- [ ] 희망 설명이 있고 정책상 허용되면 비동기로 임베딩을 생성한다.
-- [ ] AI 호출 실패가 요청 생성이나 기본 대기열 등록을 실패시키지 않도록 한다.
-- [ ] 생성 응답에 `requestId`, `status`, `expiresAt`을 반환한다.
+- [x] 매칭 요청 DTO에 음식 카테고리, 식사 일시, 구 코드, 핀 위경도, 장소명, 탐색 반경, 희망 태그와 선택형 희망 설명을 포함한다.
+- [x] 구 코드·표시명을 `regions` 서버 기준 데이터로 정규화하고 클라이언트 표시명은 신뢰하지 않는다.
+- [x] Kakao 좌표→행정구역 API로 핀이 선택한 구에 속하는지 검증하고 Point를 경도·위도 순서와 SRID 4326으로 생성한다.
+- [x] 위치 서비스 동의가 없거나 기본 활동지역과 요청 구가 다르면 요청을 거절한다.
+- [x] Redis `SET NX` 예약 키로 동일 사용자의 활성 `WAITING` 요청을 원자적으로 차단하고 DB 실패 시 보상 해제한다.
+- [x] 요청 생성 시 현재 네 가지 매칭 선호가 모두 있으면 `preference_snapshot`으로 복사하고 미설정·불완전 상태면 점수를 적용하지 않는다.
+- [x] 요청 생성 시 `matching_formula_version=PERSONALITY_MATCH_V1`을 저장한다.
+- [x] `desiredPersonalityTags`와 `desiredPersonalityText`를 요청 Entity에 반영한다.
+- [x] 희망 설명이 있으면 커밋 이후 비동기로 임베딩을 생성한다.
+- [x] AI 호출 실패·모델 미설정·잘못된 벡터 차원이 요청 생성이나 기본 대기 등록을 실패시키지 않도록 한다.
+- [x] 생성 응답에 `requestId`, `status`, `expiresAt`을 반환한다.
+- [x] `GET /matches/realtime/requests/me`와 소유자 전용 `DELETE /matches/realtime/requests/{requestId}`를 구현하고 변경 요청에 CSRF 검증을 적용한다.
 
 ## 4. 양방향 후보 탐색과 프로필 제안 API
 
