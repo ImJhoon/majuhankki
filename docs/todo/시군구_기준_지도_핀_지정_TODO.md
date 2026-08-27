@@ -10,16 +10,16 @@
 
 ## 1. 프론트엔드 및 지도 초기화
 
-- [ ] 시·도 및 시·군·구를 선택할 수 있는 필터 UI 컴포넌트 구현
-- [ ] 각 시군구별 중심부 위경도 대표 좌표 매핑 데이터 또는 API 연동 준비
-- [ ] 내 선호 지역 조회 API 결과가 존재할 경우, 해당 지역을 필터 기본값(Default)으로 세팅
-- [ ] 선택된 시군구 또는 사용자 선호 지역의 대표 좌표를 기준으로 Kakao Maps 지도 초기화 및 이동 (`map.setCenter()`)
-- [ ] 지도 중심부에 드래그 가능한 마커(핀) 구현 (`marker.setDraggable(true)`)
-- [ ] 마커 드래그 종료 시점(`dragend`)에 변경된 위경도 좌표(Lat, Lng) 획득 로직 구현
+- [x] 시·도 및 시·군·구를 선택할 수 있는 필터 UI 컴포넌트 구현
+- [x] 각 시군구별 중심부 위경도 대표 좌표 매핑 데이터 또는 API 연동 준비
+- [x] 내 선호 지역 조회 API 결과가 존재할 경우, 해당 지역을 필터 기본값(Default)으로 세팅
+- [x] 선택된 시군구 또는 사용자 선호 지역의 대표 좌표를 기준으로 Kakao Maps 지도 초기화 및 이동 (`map.setCenter()`)
+- [x] 지도 중심부에 드래그 가능한 마커(핀) 구현 (`marker.setDraggable(true)`)
+- [x] 마커 드래그 종료 시점(`dragend`)에 변경된 위경도 좌표(Lat, Lng) 획득 로직 구현
 
 ## 2. API 및 검증
 
-- [ ] 사용자 기본 선호 시군구 설정 조회/등록/삭제 API 구현 (`GET/PUT/DELETE /api/users/me/preferred-region`)
+- [x] 사용자 기본 선호 시군구 설정 조회/등록/삭제 API 구현 (`GET/PUT/DELETE /api/users/me/preferred-region`)
 - [ ] 요청된 시군구 이름 또는 코드에 해당하는 중심 좌표 반환 API 구현 (`GET /api/regions/coordinate`)
 - [ ] 확정된 위경도 좌표가 선택된 시군구 행정구역 경계 내부인지 검증하는 API 구현 (`POST /api/regions/verify-pin`)
 - [ ] 위경도 유효 범위 검증 로직 구현 (위도 -90~90, 경도 -180~180)
@@ -28,17 +28,17 @@
 
 ## 3. 데이터베이스 및 데이터 타입
 
-- [ ] `user_location_preferences` 엔티티, 리포지토리 및 DDL 마이그레이션 구현
+- [x] `user_location_preferences` 엔티티, 리포지토리 및 DDL 마이그레이션 구현
 - [ ] JTS Point를 경도(`x`), 위도(`y`) 순서와 SRID 4326으로 생성하는 공통 유틸리티 구현
-- [ ] 매칭 요청 엔티티(`MatchRequest`)에 공간 객체(`Geometry` 또는 `Point`) 타입 필드 연동
+- [x] 매칭 요청 엔티티(`MatchRequest`)에 공간 객체(`Geometry` 또는 `Point`) 타입 필드 연동
 - [ ] MatchRequestRepository에 PostGIS 함수(`ST_DWithin` 및 `ST_Distance`)를 적용한 반경 검색 쿼리 메서드 작성
 - [ ] `match_requests` 테이블의 `location` 공간 컬럼에 초고속 검색을 위한 GiST 인덱스 추가
 
 ## 4. 개인정보와 UX
 
 - [ ] 위치 기반 서비스 동의 전 지도 핀 지정 및 전송 차단
-- [ ] 동의 철회 시 `user_location_preferences` 테이블 내 해당 사용자의 선호 지역 로우(Row)를 물리 삭제(DELETE) 처리하여 위치 데이터 완전 파기
-- [ ] 동의 철회 시 기존에 활성화된 매칭 요청 핀 좌표의 즉시 파기 및 마이그레이션 정책 적용
+- [x] 동의 철회 시 `user_location_preferences` 테이블 내 해당 사용자의 선호 지역 로우(Row)를 물리 삭제(DELETE) 처리하여 위치 데이터 완전 파기
+- [x] 동의 철회 시 기존에 활성화된 매칭 요청 핀 좌표의 즉시 파기 및 마이그레이션 정책 적용
 - [ ] 핀 지정 시 "선택한 핀 위치 기준 N km 이내 노출" 안내 문구 표시
 - [ ] 상대방에게 매칭 핀의 정밀 위경도 좌표를 공개할 시점(매칭 수락 이후 등)에 대한 보안 정책 구현
 - [ ] 지정한 핀이 선택 시군구 경계를 이탈할 경우 직관적인 경고 메시지(예: 토스트 알림) 및 복구 UI 구현
