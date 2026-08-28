@@ -6,6 +6,7 @@ import org.example.project2.domain.chat.service.ChatService;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
+import jakarta.validation.Valid;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
@@ -18,6 +19,7 @@ public class ChatController {
 
     private final SimpMessagingTemplate messagingTemplate;
     private final ChatService chatService;
+    private final ChatMessageRateLimiter chatMessageRateLimiter;
 
     /**
      * 클라이언트가 /app/chat/{roomId}/send 로 메시지를 전송하면 호출됩니다.
@@ -31,10 +33,11 @@ public class ChatController {
      */
     @MessageMapping("/chat/{roomId}/send")
     public void sendMessage(@DestinationVariable Long roomId,
-                            @Payload ChatMessageDTO payload,
+                            @Valid @Payload ChatMessageDTO payload,
                             Principal principal) {
         // principal.getName()은 ChatSubscriptionInterceptor 에서 설정한 userId(UUID 문자열)
         UUID senderId = UUID.fromString(principal.getName());
+        chatMessageRateLimiter.check(senderId);
 
         ChatMessageDTO message = new ChatMessageDTO(roomId, senderId, payload.message());
 

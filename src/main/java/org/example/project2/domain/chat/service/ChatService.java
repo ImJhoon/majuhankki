@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.project2.domain.chat.dto.ChatMessageDTO;
 import org.example.project2.domain.chat.entity.ChatMessage;
 import org.example.project2.domain.chat.entity.ChatRoom;
+import org.example.project2.domain.chat.entity.ChatRoomStatus;
 import org.example.project2.domain.chat.repository.ChatMessageRepository;
 import org.example.project2.domain.chat.repository.ChatRoomRepository;
 import org.example.project2.domain.user.entity.User;
@@ -31,6 +32,9 @@ public class ChatService {
         Long roomId = messageDto.roomId();
         ChatRoom chatRoom = chatRoomRepository.findById(roomId)
                 .orElseThrow(() -> new IllegalArgumentException("채팅방을 찾을 수 없습니다. ID: " + roomId));
+        if (chatRoom.getStatus() != ChatRoomStatus.ACTIVE) {
+            throw new IllegalStateException("종료된 채팅방에는 메시지를 저장할 수 없습니다.");
+        }
 
         // 2. 송신자 조회 (sender 필드가 닉네임일 수도 있고 UUID일 수도 있습니다. 여기서는 UUID 스트링이라고 가정합니다)
         UUID senderId = messageDto.sender();
