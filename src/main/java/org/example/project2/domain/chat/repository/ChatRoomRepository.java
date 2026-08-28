@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -24,4 +25,6 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
             """)
     boolean existsParticipantByRoomIdAndUserId(@Param("roomId") Long roomId,
                                                @Param("userId") UUID userId);
+
+    Optional<ChatRoom> findByMatchId(Long matchId);
 }

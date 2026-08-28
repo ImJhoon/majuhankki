@@ -3,16 +3,13 @@ package org.example.project2.domain.matching.service.request;
 import org.example.project2.domain.matching.dto.request.RealtimeMatchRequestCreateRequest;
 import org.example.project2.domain.matching.entity.MatchRequest;
 import org.example.project2.domain.matching.entity.MatchRequestStatus;
-import org.example.project2.domain.matching.entity.PreferenceMode;
-import org.example.project2.domain.matching.entity.UserMatchingPreference;
 import org.example.project2.domain.matching.exception.request.RealtimeMatchRequestErrorCode;
 import org.example.project2.domain.matching.exception.request.RealtimeMatchRequestException;
 import org.example.project2.domain.matching.repository.MatchRequestRepository;
 import org.example.project2.domain.matching.repository.RealtimeMatchWaitingStore;
-import org.example.project2.domain.matching.repository.UserMatchingPreferenceRepository;
 import org.example.project2.domain.matching.service.calculation.PersonalityCompatibilityCalculator;
-import org.example.project2.domain.personality.entity.PersonalityDimension;
 import org.example.project2.domain.personality.entity.PersonalityTag;
+import org.example.project2.domain.personality.service.ai.PersonalityAiClient;
 import org.example.project2.domain.region.entity.Region;
 import org.example.project2.domain.region.repository.RegionRepository;
 import org.example.project2.domain.region.service.RegionPinValidationResult;
@@ -41,10 +38,12 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -58,18 +57,19 @@ class RealtimeMatchRequestServiceTest {
     @Autowired UserRepository userRepository;
     @Autowired UserLocationPreferenceRepository locationPreferenceRepository;
     @Autowired RegionRepository regionRepository;
-    @Autowired UserMatchingPreferenceRepository matchingPreferenceRepository;
     @Autowired MatchRequestRepository matchRequestRepository;
 
     @MockitoBean RealtimeMatchWaitingStore waitingStore;
     @MockitoBean RegionPinValidator regionPinValidator;
+    @MockitoBean PersonalityAiClient aiClient;
 
     private User user;
     private User otherUser;
 
     @BeforeEach
     void setUp() {
-        reset(waitingStore, regionPinValidator);
+        reset(waitingStore, regionPinValidator, aiClient);
+        when(aiClient.embeddingModelName()).thenReturn("integration-embedding-model");
         String suffix = UUID.randomUUID().toString();
         user = userRepository.save(User.builder()
                 .email("realtime-request-" + suffix + "@test.com")
@@ -91,19 +91,13 @@ class RealtimeMatchRequestServiceTest {
                 .regionName("서울특별시 강남구")
                 .locationServiceConsent(true)
                 .build());
-        for (PersonalityDimension dimension : PersonalityDimension.values()) {
-            matchingPreferenceRepository.save(UserMatchingPreference.of(
-                    user,
-                    dimension,
-                    (short) 3,
-                    PreferenceMode.SIMILAR
-            ));
-        }
         when(regionPinValidator.validate(eq(REGION_CODE), any(Double.class), any(Double.class)))
                 .thenReturn(RegionPinValidationResult.MATCHES);
         when(waitingStore.reserve(eq(user.getId()), any(String.class), any(Duration.class)))
                 .thenReturn(true);
-        when(waitingStore.activate(eq(user.getId()), any(String.class), anyLong(), any(Duration.class)))
+        when(waitingStore.activate(
+                eq(user.getId()), any(String.class), anyLong(), anyDouble(), anyDouble(), any(Duration.class)
+        ))
                 .thenReturn(true);
     }
 
@@ -111,9 +105,6 @@ class RealtimeMatchRequestServiceTest {
     void tearDown() {
         if (user != null && userRepository.existsById(user.getId())) {
             matchRequestRepository.deleteAll(matchRequestRepository.findAllByUserId(user.getId()));
-            matchingPreferenceRepository.deleteAll(
-                    matchingPreferenceRepository.findAllByUserId(user.getId())
-            );
             locationPreferenceRepository.deleteById(user.getId());
             userRepository.deleteById(user.getId());
         }
@@ -123,7 +114,7 @@ class RealtimeMatchRequestServiceTest {
     }
 
     @Test
-    void createsWaitingRequestWithNormalizedRegionPointAndPreferenceSnapshot() {
+    void createsWaitingRequestWithNormalizedRegionPointAndDesiredPersonality() {
         var response = service.create(user.getId(), validRequest(null));
 
         MatchRequest saved = matchRequestRepository.findDetailedById(response.requestId()).orElseThrow();
@@ -136,12 +127,48 @@ class RealtimeMatchRequestServiceTest {
         assertThat(saved.getSearchRadius()).isEqualTo(3_000);
         assertThat(saved.getMatchingFormulaVersion())
                 .isEqualTo(PersonalityCompatibilityCalculator.FORMULA_VERSION);
-        assertThat(saved.getPreferenceSnapshot()).isNotNull();
-        assertThat(saved.getPreferenceSnapshot().dimensions()).hasSize(4);
         assertThat(saved.getDesiredPersonalityTags()).hasSize(3);
         verify(waitingStore).activate(
-                eq(user.getId()), any(String.class), eq(saved.getId()), eq(Duration.ofMinutes(5))
+                eq(user.getId()), any(String.class), eq(saved.getId()),
+                eq(saved.getLocation().getX()), eq(saved.getLocation().getY()), eq(Duration.ofMinutes(5))
         );
+    }
+
+    @Test
+    void savesDesiredTextEmbeddingAsynchronouslyAfterRequestSave() {
+        float[] vector = new float[1536];
+        vector[0] = 1.0f;
+        String desiredText = "편안하게 대화하는 분";
+        when(aiClient.embed(desiredText)).thenReturn(Optional.of(vector));
+
+        var response = service.create(user.getId(), validRequest(desiredText));
+
+        MatchRequest saved = awaitDesiredEmbedding(response.requestId());
+
+        assertThat(response.status()).isEqualTo(MatchRequestStatus.WAITING);
+        assertThat(saved.getDesiredPersonalityText()).isEqualTo(desiredText);
+        assertThat(saved.getDesiredPersonalityEmbedding()).hasSize(1536);
+        assertThat(saved.getDesiredPersonalityEmbedding()[0]).isEqualTo(1.0f);
+        assertThat(saved.getEmbeddingModel()).isEqualTo("integration-embedding-model");
+        assertThat(saved.getEmbeddingVersion()).isEqualTo("PERSONALITY_FREE_TEXT_V2");
+        assertThat(saved.getEmbeddedAt()).isNotNull();
+        verify(aiClient).embed(desiredText);
+    }
+
+    @Test
+    void keepsWaitingRequestAndTagFallbackWhenDesiredEmbeddingFails() {
+        String desiredText = "AI 장애가 나도 요청은 대기해야 해요.";
+        when(aiClient.embed(desiredText)).thenReturn(Optional.empty());
+
+        var response = service.create(user.getId(), validRequest(desiredText));
+
+        MatchRequest saved = matchRequestRepository.findById(response.requestId()).orElseThrow();
+        assertThat(response.status()).isEqualTo(MatchRequestStatus.WAITING);
+        assertThat(saved.getDesiredPersonalityEmbedding()).isNull();
+        assertThat(saved.getEmbeddingModel()).isNull();
+        assertThat(saved.getEmbeddingVersion()).isNull();
+        assertThat(saved.getEmbeddedAt()).isNull();
+        verify(aiClient, timeout(5_000)).embed(desiredText);
     }
 
     @Test
@@ -203,6 +230,25 @@ class RealtimeMatchRequestServiceTest {
     }
 
     @Test
+    void repairsMissingRedisWaitingEntryBeforeReturningCurrentStatus() {
+        var created = service.create(user.getId(), validRequest(null));
+        when(waitingStore.remainingTtl(created.requestId()))
+                .thenReturn(Optional.empty(), Optional.empty(), Optional.of(Duration.ofMinutes(4)));
+        when(waitingStore.restore(
+                eq(user.getId()), eq(created.requestId()), anyDouble(), anyDouble(), any(Duration.class)
+        )).thenReturn(true);
+
+        var current = service.getCurrent(user.getId());
+
+        assertThat(current.requestId()).isEqualTo(created.requestId());
+        assertThat(current.status()).isEqualTo(MatchRequestStatus.WAITING);
+        assertThat(current.expiresAt()).isNotNull();
+        verify(waitingStore).restore(
+                eq(user.getId()), eq(created.requestId()), eq(127.039), eq(37.501), any(Duration.class)
+        );
+    }
+
+    @Test
     void hidesAnotherUsersRequestDuringCancellation() {
         var created = service.create(user.getId(), validRequest(null));
         String suffix = UUID.randomUUID().toString();
@@ -240,5 +286,22 @@ class RealtimeMatchRequestServiceTest {
                 ),
                 desiredText
         );
+    }
+
+    private MatchRequest awaitDesiredEmbedding(Long requestId) {
+        long deadline = System.nanoTime() + 5_000_000_000L;
+        while (System.nanoTime() < deadline) {
+            MatchRequest request = matchRequestRepository.findById(requestId).orElseThrow();
+            if (request.getDesiredPersonalityEmbedding() != null) {
+                return request;
+            }
+            try {
+                Thread.sleep(25L);
+            } catch (InterruptedException interruptedException) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError("비동기 희망 텍스트 임베딩을 기다리는 중 인터럽트가 발생했습니다.", interruptedException);
+            }
+        }
+        throw new AssertionError("매칭 요청 저장 후 5초 안에 희망 텍스트 임베딩이 저장되지 않았습니다.");
     }
 }

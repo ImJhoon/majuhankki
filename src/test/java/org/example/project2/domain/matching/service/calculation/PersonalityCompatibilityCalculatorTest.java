@@ -1,15 +1,10 @@
 package org.example.project2.domain.matching.service.calculation;
 
-import org.example.project2.domain.matching.dto.scoring.DimensionMatchPreference;
 import org.example.project2.domain.matching.dto.scoring.PersonalityCompatibilityScore;
 import org.example.project2.domain.matching.dto.scoring.PersonalityEmbeddingVector;
-import org.example.project2.domain.personality.dto.PersonalityScoresResponse;
-import org.example.project2.domain.personality.entity.PersonalityDimension;
 import org.example.project2.domain.personality.entity.PersonalityTag;
-import org.example.project2.domain.matching.entity.PreferenceMode;
 import org.junit.jupiter.api.Test;
 
-import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,16 +16,8 @@ class PersonalityCompatibilityCalculatorTest {
     );
 
     @Test
-    void appliesSimilarComplementaryImportanceAndTagScore() {
+    void scoresRequestedTagsAgainstCandidateProfileTags() {
         PersonalityCompatibilityScore result = calculator.calculate(
-                scores(20, 20, 50, 50),
-                scores(20, 80, 50, 50),
-                Map.of(
-                        PersonalityDimension.CONVERSATION_LEVEL,
-                        new DimensionMatchPreference((short) 5, PreferenceMode.SIMILAR),
-                        PersonalityDimension.MEAL_PACE,
-                        new DimensionMatchPreference((short) 5, PreferenceMode.COMPLEMENTARY)
-                ),
                 Set.of(
                         PersonalityTag.GOOD_LISTENER,
                         PersonalityTag.FOOD_TALK,
@@ -42,51 +29,37 @@ class PersonalityCompatibilityCalculatorTest {
         );
 
         assertThat(result.available()).isTrue();
-        assertThat(result.cardScore()).isEqualTo((short) 80);
         assertThat(result.tagScore()).isEqualTo((short) 67);
-        assertThat(result.structuredScore()).isEqualTo((short) 77);
-        assertThat(result.score()).isEqualTo((short) 77);
+        assertThat(result.score()).isEqualTo((short) 67);
         assertThat(result.embeddingScore()).isNull();
         assertThat(result.matchedTags())
                 .containsExactlyInAnyOrder(PersonalityTag.GOOD_LISTENER, PersonalityTag.ENJOY_DESSERT);
     }
 
     @Test
-    void limitsEmbeddingToTwentyPercentOfFinalScore() {
+    void limitsDesiredTextEmbeddingToTwentyPercentWhenTagScoreExists() {
         PersonalityCompatibilityScore result = calculator.calculate(
-                scores(100, 50, 50, 50),
-                scores(100, 50, 50, 50),
-                Map.of(
-                        PersonalityDimension.CONVERSATION_LEVEL,
-                        new DimensionMatchPreference((short) 5, PreferenceMode.SIMILAR)
-                ),
-                Set.of(),
-                Set.of(),
-                embedding(new float[]{1, 0}, "personality-document-v1:request-hash"),
-                embedding(new float[]{0, 1}, "personality-document-v1:candidate-hash")
+                Set.of(PersonalityTag.GOOD_LISTENER),
+                Set.of(PersonalityTag.GOOD_LISTENER),
+                embedding(new float[]{1, 0}, "PERSONALITY_FREE_TEXT_V2"),
+                embedding(new float[]{0, 1}, "PERSONALITY_FREE_TEXT_V2")
         );
 
-        assertThat(result.structuredScore()).isEqualTo((short) 100);
+        assertThat(result.tagScore()).isEqualTo((short) 100);
         assertThat(result.embeddingScore()).isEqualTo((short) 50);
         assertThat(result.score()).isEqualTo((short) 90);
     }
 
     @Test
-    void fallsBackToStructuredScoreWhenEmbeddingMetadataIsIncompatible() {
+    void fallsBackToTagScoreWhenEmbeddingMetadataIsIncompatible() {
         PersonalityCompatibilityScore result = calculator.calculate(
-                scores(50, 50, 50, 50),
-                scores(50, 50, 50, 50),
-                Map.of(
-                        PersonalityDimension.CONVERSATION_LEVEL,
-                        new DimensionMatchPreference((short) 5, PreferenceMode.SIMILAR)
-                ),
-                Set.of(),
-                Set.of(),
-                embedding(new float[]{1, 0}, "personality-document-v1:request-hash"),
+                Set.of(PersonalityTag.GOOD_LISTENER),
+                Set.of(PersonalityTag.GOOD_LISTENER),
+                embedding(new float[]{1, 0}, "PERSONALITY_FREE_TEXT_V2"),
                 new PersonalityEmbeddingVector(
                         new float[]{1, 0},
                         "different-model",
-                        "personality-document-v1:candidate-hash"
+                        "PERSONALITY_FREE_TEXT_V2"
                 )
         );
 
@@ -95,30 +68,162 @@ class PersonalityCompatibilityCalculatorTest {
     }
 
     @Test
-    void doesNotUseEmbeddingAsTheOnlyPersonalityScore() {
+    void fallsBackToTagScoreWhenEmbeddingDimensionsDiffer() {
         PersonalityCompatibilityScore result = calculator.calculate(
-                null,
-                null,
-                Map.of(),
-                Set.of(),
-                Set.of(),
+                Set.of(PersonalityTag.GOOD_LISTENER),
+                Set.of(PersonalityTag.GOOD_LISTENER),
+                embedding(new float[]{1, 0}, "PERSONALITY_FREE_TEXT_V2"),
+                embedding(new float[]{1, 0, 0}, "PERSONALITY_FREE_TEXT_V2")
+        );
+
+        assertThat(result.score()).isEqualTo((short) 100);
+        assertThat(result.tagScore()).isEqualTo((short) 100);
+        assertThat(result.embeddingScore()).isNull();
+    }
+
+    @Test
+    void fallsBackToTagScoreWhenEmbeddingVersionFamiliesDiffer() {
+        PersonalityCompatibilityScore result = calculator.calculate(
+                Set.of(PersonalityTag.GOOD_LISTENER),
+                Set.of(PersonalityTag.GOOD_LISTENER),
+                embedding(new float[]{1, 0}, "PERSONALITY_FREE_TEXT_V2"),
+                embedding(new float[]{1, 0}, "PERSONALITY_FREE_TEXT_V3")
+        );
+
+        assertThat(result.score()).isEqualTo((short) 100);
+        assertThat(result.tagScore()).isEqualTo((short) 100);
+        assertThat(result.embeddingScore()).isNull();
+    }
+
+    @Test
+    void ignoresLegacyEmbeddingVersionEvenWhenBothVectorsUseThatVersion() {
+        PersonalityCompatibilityScore result = calculator.calculate(
+                Set.of(PersonalityTag.GOOD_LISTENER),
+                Set.of(PersonalityTag.GOOD_LISTENER),
                 embedding(new float[]{1, 0}, "personality-document-v1:request-hash"),
                 embedding(new float[]{1, 0}, "personality-document-v1:candidate-hash")
         );
 
-        assertThat(result)
-                .isEqualTo(PersonalityCompatibilityScore.unavailable(
-                        PersonalityCompatibilityCalculator.FORMULA_VERSION
-                ));
+        assertThat(result.score()).isEqualTo((short) 100);
+        assertThat(result.tagScore()).isEqualTo((short) 100);
+        assertThat(result.embeddingScore()).isNull();
     }
 
-    private PersonalityScoresResponse scores(int conversation, int mealPace, int planning, int novelty) {
-        return new PersonalityScoresResponse(
-                (short) conversation,
-                (short) mealPace,
-                (short) planning,
-                (short) novelty
+    @Test
+    void fallsBackToTagScoreWhenOnlyOneEmbeddingIsPresent() {
+        PersonalityCompatibilityScore result = calculator.calculate(
+                Set.of(PersonalityTag.GOOD_LISTENER),
+                Set.of(PersonalityTag.GOOD_LISTENER),
+                embedding(new float[]{1, 0}, "PERSONALITY_FREE_TEXT_V2"),
+                null
         );
+
+        assertThat(result.score()).isEqualTo((short) 100);
+        assertThat(result.tagScore()).isEqualTo((short) 100);
+        assertThat(result.embeddingScore()).isNull();
+    }
+
+    @Test
+    void keepsTagScoreAsTheFinalScoreWhenAiEmbeddingIsUnavailable() {
+        PersonalityCompatibilityScore result = calculator.calculate(
+                Set.of(PersonalityTag.GOOD_LISTENER, PersonalityTag.FOOD_TALK),
+                Set.of(PersonalityTag.GOOD_LISTENER),
+                null,
+                null
+        );
+
+        assertThat(result.available()).isTrue();
+        assertThat(result.tagScore()).isEqualTo((short) 50);
+        assertThat(result.embeddingScore()).isNull();
+        assertThat(result.score()).isEqualTo((short) 50);
+    }
+
+    @Test
+    void keepsVersionFamilySuffixesCompatibleWhenModelAndDimensionsMatch() {
+        PersonalityCompatibilityScore result = calculator.calculate(
+                Set.of(),
+                Set.of(),
+                embedding(new float[]{1, 0}, "PERSONALITY_FREE_TEXT_V2:request"),
+                embedding(new float[]{1, 0}, "PERSONALITY_FREE_TEXT_V2:candidate")
+        );
+
+        assertThat(result.available()).isTrue();
+        assertThat(result.embeddingScore()).isEqualTo((short) 100);
+        assertThat(result.score()).isEqualTo((short) 100);
+    }
+
+    @Test
+    void doesNotIncludeTagSignalInTheEmbeddingScore() {
+        PersonalityCompatibilityScore withMatchingTag = calculator.calculate(
+                Set.of(PersonalityTag.GOOD_LISTENER),
+                Set.of(PersonalityTag.GOOD_LISTENER),
+                embedding(new float[]{1, 0}, "PERSONALITY_FREE_TEXT_V2"),
+                embedding(new float[]{0, 1}, "PERSONALITY_FREE_TEXT_V2")
+        );
+        PersonalityCompatibilityScore withDifferentTag = calculator.calculate(
+                Set.of(PersonalityTag.GOOD_LISTENER),
+                Set.of(PersonalityTag.FOOD_TALK),
+                embedding(new float[]{1, 0}, "PERSONALITY_FREE_TEXT_V2"),
+                embedding(new float[]{0, 1}, "PERSONALITY_FREE_TEXT_V2")
+        );
+
+        assertThat(withMatchingTag.embeddingScore()).isEqualTo((short) 50);
+        assertThat(withDifferentTag.embeddingScore()).isEqualTo((short) 50);
+        assertThat(withMatchingTag.tagScore()).isEqualTo((short) 100);
+        assertThat(withDifferentTag.tagScore()).isEqualTo((short) 0);
+        assertThat(withMatchingTag.score()).isEqualTo((short) 90);
+        assertThat(withDifferentTag.score()).isEqualTo((short) 10);
+    }
+
+    @Test
+    void usesDesiredTextEmbeddingWhenCandidateHasNoProfileTags() {
+        PersonalityCompatibilityScore result = calculator.calculate(
+                Set.of(PersonalityTag.GOOD_LISTENER),
+                Set.of(),
+                embedding(new float[]{1, 0}, "PERSONALITY_FREE_TEXT_V2"),
+                embedding(new float[]{1, 0}, "PERSONALITY_FREE_TEXT_V2")
+        );
+
+        assertThat(result.available()).isTrue();
+        assertThat(result.tagScore()).isNull();
+        assertThat(result.embeddingScore()).isEqualTo((short) 100);
+        assertThat(result.score()).isEqualTo((short) 100);
+    }
+
+    @Test
+    void isUnavailableWhenNeitherTagsNorCompatibleEmbeddingCanBeCompared() {
+        PersonalityCompatibilityScore result = calculator.calculate(
+                Set.of(),
+                Set.of(),
+                null,
+                null
+        );
+
+        assertThat(result).isEqualTo(PersonalityCompatibilityScore.unavailable(
+                PersonalityCompatibilityCalculator.FORMULA_VERSION
+        ));
+    }
+
+    @Test
+    void validatesStoredEmbeddingForCurrentRankingBeforeUsingIt() {
+        float[] validValues = new float[PersonalityEmbeddingVector.EXPECTED_DIMENSION];
+        validValues[0] = 1;
+
+        assertThat(new PersonalityEmbeddingVector(
+                validValues,
+                "embedding-model",
+                "PERSONALITY_FREE_TEXT_V2:request"
+        ).isValidForCurrentRanking()).isTrue();
+        assertThat(new PersonalityEmbeddingVector(
+                new float[]{1, 0},
+                "embedding-model",
+                "PERSONALITY_FREE_TEXT_V2"
+        ).isValidForCurrentRanking()).isFalse();
+        assertThat(new PersonalityEmbeddingVector(
+                validValues,
+                "embedding-model",
+                "PERSONALITY_FREE_TEXT_V3"
+        ).isValidForCurrentRanking()).isFalse();
     }
 
     private PersonalityEmbeddingVector embedding(float[] values, String sourceVersion) {

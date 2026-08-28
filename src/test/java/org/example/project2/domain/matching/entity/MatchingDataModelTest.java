@@ -1,14 +1,16 @@
 package org.example.project2.domain.matching.entity;
 
 import jakarta.persistence.EntityManager;
+import org.example.project2.domain.chat.entity.ChatRoom;
+import org.example.project2.domain.chat.repository.ChatRoomRepository;
 import org.example.project2.domain.matching.dto.scoring.BidirectionalMatchScoreSnapshot;
-import org.example.project2.domain.matching.dto.scoring.DimensionMatchPreference;
-import org.example.project2.domain.matching.dto.scoring.MatchingPreferenceSnapshot;
-import org.example.project2.domain.matching.entity.PreferenceMode;
+import org.example.project2.domain.matching.entity.Match;
 import org.example.project2.domain.matching.repository.MatchProposalRepository;
+import org.example.project2.domain.matching.repository.MatchParticipantRepository;
+import org.example.project2.domain.matching.repository.MatchRepository;
 import org.example.project2.domain.matching.repository.MatchRequestRepository;
 import org.example.project2.domain.matching.service.proposal.MatchProposalLifecycleService;
-import org.example.project2.domain.personality.entity.PersonalityDimension;
+import org.example.project2.domain.personality.entity.PersonalityTag;
 import org.example.project2.domain.user.entity.User;
 import org.example.project2.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,8 +25,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.EnumMap;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,6 +41,9 @@ class MatchingDataModelTest {
     @Autowired UserRepository userRepository;
     @Autowired MatchRequestRepository matchRequestRepository;
     @Autowired MatchProposalRepository matchProposalRepository;
+    @Autowired MatchRepository matchRepository;
+    @Autowired MatchParticipantRepository matchParticipantRepository;
+    @Autowired ChatRoomRepository chatRoomRepository;
     @Autowired MatchProposalLifecycleService matchProposalLifecycleService;
     @Autowired EntityManager entityManager;
 
@@ -58,7 +63,7 @@ class MatchingDataModelTest {
     }
 
     @Test
-    void storesTypedPreferenceSnapshotAndVectorEmbedding() {
+    void storesDesiredPersonalityVectorEmbedding() {
         float[] embedding = new float[1536];
         embedding[0] = 0.25f;
         request1.updateDesiredPersonalityEmbedding(embedding, "text-embedding-model", "v1", NOW);
@@ -69,14 +74,35 @@ class MatchingDataModelTest {
         entityManager.clear();
 
         MatchRequest reloaded = matchRequestRepository.findById(requestId).orElseThrow();
-        assertThat(reloaded.getPreferenceSnapshot().dimensions())
-                .containsOnlyKeys(PersonalityDimension.values());
         assertThat(reloaded.getDesiredPersonalityEmbedding()).hasSize(1536);
         assertThat(reloaded.getDesiredPersonalityEmbedding()[0]).isEqualTo(0.25f);
 
         float[] returned = reloaded.getDesiredPersonalityEmbedding();
         returned[0] = 77.0f;
         assertThat(reloaded.getDesiredPersonalityEmbedding()[0]).isEqualTo(0.25f);
+    }
+
+    @Test
+    void findsWaitingCandidatesWithinTheSourceRequestRadiusWithPostgis() {
+        MatchRequest nearby = request2;
+        User narrowRadiusUser = saveUser("matching-narrow-" + UUID.randomUUID());
+        MatchRequest outsideCandidateRadius = matchRequestRepository.save(
+                createRequest(narrowRadiusUser, 127.020, 37.500, 500)
+        );
+        User outsideUser = saveUser("matching-outside-" + UUID.randomUUID());
+        MatchRequest outside = matchRequestRepository.save(createRequest(outsideUser, 127.100, 37.500));
+        matchRequestRepository.flush();
+
+        List<MatchRequest> candidates = matchRequestRepository.findWaitingCandidates(
+                MatchRequestStatus.WAITING,
+                request1.getId(),
+                user1.getId()
+        );
+
+        assertThat(candidates).extracting(MatchRequest::getId)
+                .contains(nearby.getId())
+                .doesNotContain(outsideCandidateRadius.getId())
+                .doesNotContain(outside.getId());
     }
 
     @Test
@@ -178,8 +204,16 @@ class MatchingDataModelTest {
                 .isEqualTo(request2IsCanonicalFirst ? input.sourceToTargetScore() : input.targetToSourceScore());
         assertThat(stored.targetToSourceScore())
                 .isEqualTo(request2IsCanonicalFirst ? input.targetToSourceScore() : input.sourceToTargetScore());
+        assertThat(stored.sourceToTargetMatchedTags())
+                .isEqualTo(request2IsCanonicalFirst
+                        ? input.sourceToTargetMatchedTags()
+                        : input.targetToSourceMatchedTags());
+        assertThat(stored.targetToSourceMatchedTags())
+                .isEqualTo(request2IsCanonicalFirst
+                        ? input.targetToSourceMatchedTags()
+                        : input.sourceToTargetMatchedTags());
         assertThat(stored.pairScore()).isEqualTo((short) 75);
-        assertThat(stored.formulaVersion()).isEqualTo("PERSONALITY_MATCH_V1");
+        assertThat(stored.formulaVersion()).isEqualTo("DESIRED_PERSONALITY_MATCH_V1_BIDIRECTIONAL_MIN_V1");
     }
 
     @Test
@@ -252,6 +286,45 @@ class MatchingDataModelTest {
         assertThat(reloadedRequest2.getStatus()).isEqualTo(MatchRequestStatus.WAITING);
     }
 
+    @Test
+    void createsOneMatchTwoParticipantsAndOneChatRoomOnlyAfterBothAccept() {
+        request1.startConfirming();
+        request2.startConfirming();
+        MatchProposal proposal = matchProposalRepository.saveAndFlush(
+                MatchProposal.of(request1, request2, scoreSnapshot(), NOW.plusSeconds(15)));
+
+        matchProposalLifecycleService.decide(
+                proposal.getId(), request1.getId(), MatchProposalDecision.ACCEPTED, NOW);
+        entityManager.flush();
+
+        assertThat(matchRepository.findByRequestId(request1.getId())).isEmpty();
+        assertThat(matchParticipantRepository.findAllByMatchId(-1L)).isEmpty();
+
+        matchProposalLifecycleService.decide(
+                proposal.getId(), request2.getId(), MatchProposalDecision.ACCEPTED, NOW.plusSeconds(1));
+        entityManager.flush();
+        entityManager.clear();
+
+        MatchProposal reloadedProposal = matchProposalRepository.findById(proposal.getId()).orElseThrow();
+        MatchRequest reloadedRequest1 = matchRequestRepository.findById(request1.getId()).orElseThrow();
+        MatchRequest reloadedRequest2 = matchRequestRepository.findById(request2.getId()).orElseThrow();
+        Match match = matchRepository.findByRequestId(request1.getId()).orElseThrow();
+        ChatRoom chatRoom = chatRoomRepository.findByMatchId(match.getId()).orElseThrow();
+
+        assertThat(reloadedProposal.getStatus()).isEqualTo(MatchProposalStatus.MATCHED);
+        assertThat(reloadedRequest1.getStatus()).isEqualTo(MatchRequestStatus.MATCHED);
+        assertThat(reloadedRequest2.getStatus()).isEqualTo(MatchRequestStatus.MATCHED);
+        assertThat(matchParticipantRepository.findAllByMatchId(match.getId())).hasSize(2);
+        assertThat(chatRoom.getMatch().getId()).isEqualTo(match.getId());
+
+        // 동일한 완료 호출은 기존 결과를 재사용하며 추가 레코드를 만들지 않는다.
+        matchProposalLifecycleService.completeMatch(proposal.getId());
+        entityManager.flush();
+        assertThat(matchRepository.findByRequestId(request1.getId())).containsSame(match);
+        assertThat(matchParticipantRepository.findAllByMatchId(match.getId())).hasSize(2);
+        assertThat(chatRoomRepository.findByMatchId(match.getId())).containsSame(chatRoom);
+    }
+
     private User saveUser(String value) {
         return userRepository.save(User.builder()
                 .email(value + "@test.com")
@@ -261,6 +334,10 @@ class MatchingDataModelTest {
     }
 
     private MatchRequest createRequest(User user, double longitude, double latitude) {
+        return createRequest(user, longitude, latitude, 3000);
+    }
+
+    private MatchRequest createRequest(User user, double longitude, double latitude, int searchRadius) {
         Point point = GEOMETRY_FACTORY.createPoint(new Coordinate(longitude, latitude));
         return MatchRequest.builder()
                 .user(user)
@@ -270,30 +347,27 @@ class MatchingDataModelTest {
                 .regionName("서울특별시 강남구")
                 .locationName("테스트 위치")
                 .location(point)
-                .searchRadius(3000)
+                .searchRadius(searchRadius)
+                .desiredPersonalityTags(Set.of(
+                        PersonalityTag.GOOD_LISTENER,
+                        PersonalityTag.FOOD_TALK,
+                        PersonalityTag.ENJOY_DESSERT
+                ))
                 .desiredPersonalityText("편안하게 대화할 수 있는 분")
-                .preferenceSnapshot(MatchingPreferenceSnapshot.of(completePreferences()))
-                .matchingFormulaVersion("PERSONALITY_MATCH_V1")
+                .matchingFormulaVersion("DESIRED_PERSONALITY_MATCH_V1")
                 .build();
-    }
-
-    private EnumMap<PersonalityDimension, DimensionMatchPreference> completePreferences() {
-        EnumMap<PersonalityDimension, DimensionMatchPreference> preferences =
-                new EnumMap<>(PersonalityDimension.class);
-        for (PersonalityDimension dimension : PersonalityDimension.values()) {
-            preferences.put(dimension, new DimensionMatchPreference((short) 3, PreferenceMode.SIMILAR));
-        }
-        return preferences;
     }
 
     private BidirectionalMatchScoreSnapshot scoreSnapshot() {
         return new BidirectionalMatchScoreSnapshot(
                 (short) 80,
                 List.of("대화 선호가 비슷해요"),
+                List.of(PersonalityTag.GOOD_LISTENER),
                 (short) 70,
                 List.of("식사 속도 선호가 잘 맞아요"),
+                List.of(PersonalityTag.FOOD_TALK),
                 (short) 75,
-                "PERSONALITY_MATCH_V1"
+                "DESIRED_PERSONALITY_MATCH_V1_BIDIRECTIONAL_MIN_V1"
         );
     }
 }

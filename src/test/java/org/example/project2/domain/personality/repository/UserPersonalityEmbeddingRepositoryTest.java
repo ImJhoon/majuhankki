@@ -11,6 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,10 +46,16 @@ class UserPersonalityEmbeddingRepositoryTest {
                 .profile(profile)
                 .build();
         embedding.replace("versioned test document", new float[1536],
-                "test-model", "personality-document-v1:test");
+                "test-model", "PERSONALITY_FREE_TEXT_V2");
 
         embeddingRepository.saveAndFlush(embedding);
 
         assertThat(embeddingRepository.findById(user.getId())).isPresent();
+        assertThat(profileRepository.findAllByUserIdIn(List.of(user.getId())))
+                .extracting(UserPersonalityProfile::getUserId)
+                .containsExactly(user.getId());
+        assertThat(embeddingRepository.findAllByUserIdIn(List.of(user.getId())))
+                .extracting(UserPersonalityEmbedding::getUserId)
+                .containsExactly(user.getId());
     }
 }
