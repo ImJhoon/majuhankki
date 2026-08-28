@@ -12,6 +12,7 @@ import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBr
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.StompWebSocketEndpointRegistration;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
 import org.springframework.util.StringUtils;
 
 @Configuration
@@ -57,5 +58,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void configureClientOutboundChannel(ChannelRegistration registration) {
         // 서버→클라이언트 메시지 전송 시 채팅방 상태 검증
         registration.interceptors(chatOutboundAccessInterceptor);
+    }
+
+    @Override
+    public void configureWebSocketTransport(WebSocketTransportRegistration registration) {
+        registration.setMessageSizeLimit(16 * 1024)
+                .setSendBufferSizeLimit(64 * 1024)
+                .setSendTimeLimit(10_000);
     }
 }

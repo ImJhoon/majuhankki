@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.context.annotation.Profile;
+
 /**
  * <h1>웹소켓 채팅 개발용 임시 테스트 데이터 런너</h1>
  *
@@ -52,18 +54,17 @@ public class WebSocketTestFixtureRunner implements ApplicationRunner {
             insertDummyUser("usera@test.com", "테스트A");
             insertDummyUser("userb@test.com", "테스트B");
 
-            // 2. 현재 DB에 존재하는 모든 유저의 ID를 가져옴
-            List<Map<String, Object>> users = jdbcTemplate.queryForList("SELECT id, nickname FROM users");
-            if (users.size() < 2) {
-                log.warn("[TestFixture] 유저 수가 부족합니다.");
+            // 2. 정확히 usera와 userb 계정의 UUID를 조회
+            UUID userAId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE email = 'usera@test.com'", UUID.class);
+            UUID userBId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE email = 'userb@test.com'", UUID.class);
+
+            if (userAId == null || userBId == null) {
+                log.warn("[TestFixture] 테스트용 유저 UUID 조회에 실패하였습니다.");
                 return;
             }
 
             // 3. matches 테이블 생성을 위한 match_requests 더미 2건 강제 삽입 (FK 제약 조건 만족용)
             // request_1_id, request_2_id가 NOT NULL 이므로 먼저 삽입되어야 함
-            UUID userAId = (UUID) users.get(0).get("id");
-            UUID userBId = (UUID) users.get(1).get("id");
-
             jdbcTemplate.execute(
                     "INSERT INTO match_requests (id, user_id, food_category, meal_at, region_code, region_name, location_name, location, status, reject_count, created_at, updated_at) " +
                     "VALUES (1, '" + userAId + "', 'KOREAN', NOW(), '11680', '서울특별시 강남구', '강남역 11번 출구', ST_GeomFromText('POINT(127.0473 37.5172)', 4326)::geography, 'MATCHED', 0, NOW(), NOW()) " +
@@ -90,19 +91,20 @@ public class WebSocketTestFixtureRunner implements ApplicationRunner {
                     "ON CONFLICT (id) DO NOTHING"
             );
 
-            // 5. 모든 유저를 1번 방의 참여자로 등록
-            for (Map<String, Object> userMap : users) {
+            // 6. DB에 존재하는 모든 유저를 1번 방의 참여자로 등록 (직접 만든 계정 포함)
+            List<Map<String, Object>> allUsers = jdbcTemplate.queryForList("SELECT id, nickname FROM users");
+            for (Map<String, Object> userMap : allUsers) {
                 Object rawId = userMap.get("id");
                 UUID userId = (rawId instanceof UUID) ? (UUID) rawId : UUID.fromString(rawId.toString());
                 String nickname = (String) userMap.get("nickname");
 
                 jdbcTemplate.update(
                         "INSERT INTO match_participants (match_id, user_id, role, joined_at) " +
-                        "VALUES (1, ?, 'REQUESTER', NOW()) " +
+                        "VALUES (1, ?, 'PARTICIPANT', NOW()) " +
                         "ON CONFLICT (match_id, user_id) DO NOTHING",
                         userId
                 );
-                log.info("[TestFixture] 유저 {} ({}) 1번 방 참여 등록", nickname, userId);
+                log.info("[TestFixture] 유저 {} ({}) 1번 방 참여 등록 완료", nickname, userId);
             }
 
             log.info("[TestFixture] 채팅 테스트용 데이터 구축 성공! (채팅방 ID = 1)");
