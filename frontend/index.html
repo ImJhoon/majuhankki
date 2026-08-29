@@ -17,6 +17,45 @@
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
     <link rel="stylesheet" href="/src/style.css" />
 
+    <!-- 로그인 상태 및 라우트 깜빡임 방지용 가드 -->
+    <script>
+      (function() {
+        const loggedIn = sessionStorage.getItem('project2.isLoggedIn') === 'true';
+        document.documentElement.classList.add(loggedIn ? 'logged-in' : 'logged-out');
+
+        if (window.location.pathname !== '/') {
+          document.documentElement.classList.add('route-loading');
+        }
+        if (window.location.pathname === '/oauth/callback') {
+          document.documentElement.classList.add('is-oauth-callback');
+        }
+      })();
+    </script>
+    <style>
+      .logged-in .header-logged-out {
+        display: none !important;
+      }
+      .logged-out .header-logged-in {
+        display: none !important;
+      }
+      .logged-out .auth-only-button {
+        display: none !important;
+      }
+      .logged-in .auth-only-button {
+        display: flex !important;
+      }
+      .route-loading .default-landing-content {
+        display: none !important;
+      }
+      .is-oauth-callback header,
+      .is-oauth-callback footer {
+        display: none !important;
+      }
+      .is-oauth-callback body {
+        padding-top: 0 !important;
+      }
+    </style>
+
     <!-- Kakao Maps API -->
     <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=%VITE_KAKAO_MAP_API_KEY%&libraries=services,clusterer"></script>
 
@@ -121,13 +160,30 @@
 
         <!-- Header Auth Actions -->
         <div id="header-auth" class="flex items-center gap-3">
-          <button id="btn-header-login" class="btn-secondary px-4 py-2 rounded-full text-xs sm:text-sm font-semibold">
-            로그인
-          </button>
-          <button id="btn-header-start" class="btn-primary px-4 py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-md">
-            <span>시작하기</span>
-            <span class="material-symbols-outlined text-base">arrow_forward</span>
-          </button>
+          <!-- Logged out actions -->
+          <div class="header-logged-out flex items-center gap-3">
+            <button id="btn-header-login" class="btn-secondary px-4 py-2 rounded-full text-xs sm:text-sm font-semibold">
+              로그인
+            </button>
+            <button id="btn-header-start" class="btn-primary px-4 py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-md">
+              <span>시작하기</span>
+              <span class="material-symbols-outlined text-base">arrow_forward</span>
+            </button>
+          </div>
+          <!-- Logged in actions -->
+          <div class="header-logged-in flex items-center gap-2 sm:gap-3">
+            <a href="/personality/survey" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-brand-navy text-xs font-bold transition-colors">
+              <span class="material-symbols-outlined text-sm text-primary-container">psychology</span>
+              <span>식사 성향</span>
+            </a>
+            <button id="btn-revoke-location" class="btn-secondary px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold text-error hover:bg-error/10 hover:text-error border-error/30 flex items-center gap-1">
+              <span class="material-symbols-outlined text-sm">no_accounts</span>
+              <span>위치동의 철회</span>
+            </button>
+            <button id="btn-logout" class="btn-secondary px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold">
+              로그아웃
+            </button>
+          </div>
         </div>
       </div>
     </header>
@@ -135,7 +191,7 @@
     <!-- Main Container -->
     <div id="app" class="flex-grow flex flex-col">
       <!-- Landing Page Content (Default) -->
-      <main class="flex-grow">
+      <main class="flex-grow default-landing-content">
         <!-- Hero Section -->
         <section class="max-w-7xl mx-auto px-margin-mobile md:px-margin-desktop py-12 md:py-20 flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
           <div class="flex-1 space-y-6 text-center lg:text-left">
@@ -150,7 +206,7 @@
             <!-- Quick Match Box -->
             <div class="bg-surface-container-lowest p-3 sm:p-4 rounded-card shadow-soft flex flex-col sm:flex-row items-center gap-3 max-w-xl mx-auto lg:mx-0 border border-outline-variant/30">
               <!-- 채팅방 가기 버튼: 로그인 시에만 표시 -->
-              <button id="btn-go-chat" class="hidden w-full sm:w-auto btn-secondary py-3 px-5 rounded-full text-sm font-semibold flex items-center justify-center gap-1.5 shrink-0">
+              <button id="btn-go-chat" class="auth-only-button hidden w-full sm:w-auto btn-secondary py-3 px-5 rounded-full text-sm font-semibold flex items-center justify-center gap-1.5 shrink-0">
                 <span class="material-symbols-outlined text-lg">chat</span>
                 <span>채팅방 가기</span>
               </button>
@@ -158,7 +214,7 @@
                 <span class="material-symbols-outlined text-lg">local_dining</span>
                 <span>마주한끼 찾기</span>
               </button>
-              <button id="btn-register-preferred" class="hidden w-full sm:w-auto btn-secondary py-3 px-5 rounded-full text-sm font-semibold flex items-center justify-center gap-1.5 shrink-0">
+              <button id="btn-register-preferred" class="auth-only-button hidden w-full sm:w-auto btn-secondary py-3 px-5 rounded-full text-sm font-semibold flex items-center justify-center gap-1.5 shrink-0">
                 <span class="material-symbols-outlined text-lg">favorite</span>
                 <span>선호위치 등록</span>
               </button>

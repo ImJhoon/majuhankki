@@ -79,6 +79,9 @@ const loadRegions = async () => {
   }
 }
 
+// 비동기 행정구역 로드 프로미스
+const regionsPromise = loadRegions()
+
 // SPA 라우팅 네비게이션 함수
 export function navigateTo(path) {
   if (path === '/') {
@@ -100,29 +103,47 @@ const routeApp = async () => {
   const path = window.location.pathname
   const params = new URLSearchParams(window.location.search)
 
+  const header = document.querySelector('header')
+  const footer = document.querySelector('footer')
+
   if (path === '/oauth/callback') {
+    header?.classList.add('hidden')
+    footer?.classList.add('hidden')
+    document.body.classList.remove('pt-[88px]')
     renderOAuthCallback(app)
-  } else if (path === '/profile/setup') {
-    renderProfileSetup(app)
-  } else if (path === '/map') {
-    if (params.get('mode') === 'preferred') {
-      await renderPreferredRegionPage(app)
-    } else {
-      await renderMatchMapPage(app)
-    }
-  } else if (path === '/personality/survey') {
-    renderPersonalitySurvey(app)
-  } else if (path === '/chat') {
-    renderChatPage(app)
-  } else if (path === '/matching/request') {
-    await renderMatchingRequestPage(app)
   } else {
-    // 기본 메인 랜딩 페이지
-    initLandingPage()
+    header?.classList.remove('hidden')
+    footer?.classList.remove('hidden')
+    document.body.classList.add('pt-[88px]')
+
+    if (path === '/profile/setup') {
+      renderProfileSetup(app)
+    } else if (path === '/map') {
+      await regionsPromise // 지도 관련 페이지 진입 시에만 데이터를 기다림
+      if (params.get('mode') === 'preferred') {
+        await renderPreferredRegionPage(app)
+      } else {
+        await renderMatchMapPage(app)
+      }
+    } else if (path === '/personality/survey') {
+      renderPersonalitySurvey(app)
+    } else if (path === '/chat') {
+      renderChatPage(app)
+    } else if (path === '/matching/request') {
+      await regionsPromise // 매칭 요청 페이지 진입 시에만 데이터를 기다림
+      await renderMatchingRequestPage(app)
+    } else {
+      // 기본 메인 랜딩 페이지
+      initLandingPage()
+    }
+    
+    // 헤더 상태 동기화
+    initCommonHeader()
   }
-  
-  // 헤더 상태 동기화
-  initCommonHeader()
+
+  // 라우팅이 완료되면 임시 감춤 상태 해제
+  document.documentElement.classList.remove('route-loading')
+  document.documentElement.classList.remove('is-oauth-callback')
 }
 
 // 뒤로가기/앞으로가기 처리
@@ -130,8 +151,8 @@ window.addEventListener('popstate', routeApp)
 
 // 앱 초기 진입점
 const initApp = async () => {
-  await loadRegions()
-  await routeApp()
+  routeApp() // 즉시 메인 페이지 및 헤더 상태를 렌더링
+  await regionsPromise
 }
 
 initApp()
@@ -298,29 +319,14 @@ function initLandingPage() {
 
 // 메인 헤더 및 온보딩 연동 처리
 function initCommonHeader() {
-  const token = getAccessToken()
   const headerAuth = document.querySelector('#header-auth')
   if (!headerAuth) return
 
-  if (token) {
-    headerAuth.innerHTML = `
-      <div class="flex items-center gap-2 sm:gap-3">
-        <a href="/personality/survey" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-brand-navy text-xs font-bold transition-colors">
-          <span class="material-symbols-outlined text-sm text-primary-container">psychology</span>
-          <span>식사 성향</span>
-        </a>
-        <button id="btn-revoke-location" class="btn-secondary px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold text-error hover:bg-error/10 hover:text-error border-error/30 flex items-center gap-1">
-          <span class="material-symbols-outlined text-sm">no_accounts</span>
-          <span>위치동의 철회</span>
-        </button>
-        <button id="btn-logout" class="btn-secondary px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold">
-          로그아웃
-        </button>
-      </div>
-    `
-    
-    // 위치 동의 철회 버튼 바인딩
-    document.querySelector('#btn-revoke-location')?.addEventListener('click', async (e) => {
+  // 위치 동의 철회 버튼 바인딩
+  const btnRevoke = document.querySelector('#btn-revoke-location')
+  if (btnRevoke && !btnRevoke.dataset.bound) {
+    btnRevoke.dataset.bound = 'true'
+    btnRevoke.addEventListener('click', async (e) => {
       e.preventDefault()
       e.stopPropagation()
       if (confirm('위치 정보 이용 동의를 철회하시겠습니까?\n철회 시 등록된 선호위치와 대기 중인 모든 매칭 요청이 파기됩니다.')) {
@@ -356,8 +362,13 @@ function initCommonHeader() {
         }
       }
     })
+  }
 
-    document.querySelector('#btn-logout')?.addEventListener('click', async (e) => {
+  // 로그아웃 버튼 바인딩
+  const btnLogout = document.querySelector('#btn-logout')
+  if (btnLogout && !btnLogout.dataset.bound) {
+    btnLogout.dataset.bound = 'true'
+    btnLogout.addEventListener('click', async (e) => {
       e.preventDefault()
       e.stopPropagation()
       try {
@@ -369,47 +380,46 @@ function initCommonHeader() {
         navigateTo('/')
       }
     })
-  } else {
-    headerAuth.innerHTML = `
-      <div class="flex items-center gap-3">
-        <button id="btn-header-login" class="btn-secondary px-4 py-2 rounded-full text-xs sm:text-sm font-semibold">
-          로그인
-        </button>
-        <button id="btn-header-start" class="btn-primary px-4 py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-md">
-          <span>시작하기</span>
-          <span class="material-symbols-outlined text-base">arrow_forward</span>
-        </button>
-      </div>
-    `
-    const openAuthModal = (isSignup = false) => {
-      const authModal = document.querySelector('#auth-modal')
-      const loginForm = document.querySelector('#form-local-login')
-      const signupForm = document.querySelector('#form-local-signup')
-      const modalTitle = document.querySelector('#modal-title')
-      const modalDesc = document.querySelector('#modal-desc')
-      
-      if (isSignup) {
-        loginForm?.classList.add('hidden')
-        signupForm?.classList.remove('hidden')
-        if (modalTitle) modalTitle.textContent = '이메일 회원가입'
-        if (modalDesc) modalDesc.textContent = '간단한 가입으로 나만의 1:1 밥친구를 찾아보세요.'
-      } else {
-        loginForm?.classList.remove('hidden')
-        signupForm?.classList.add('hidden')
-        if (modalTitle) modalTitle.textContent = '마주한끼 시작하기'
-        if (modalDesc) modalDesc.textContent = '혼밥 말고 따뜻한 한 끼를 함께할 친구를 만나보세요.'
-      }
-      
-      if (authModal) {
-        authModal.style.display = 'grid'
-        authModal.offsetHeight
-        authModal.classList.add('is-open')
-        authModal.setAttribute('aria-hidden', 'false')
-      }
-    }
+  }
 
-    document.querySelector('#btn-header-login')?.addEventListener('click', () => openAuthModal(false))
-    document.querySelector('#btn-header-start')?.addEventListener('click', () => openAuthModal(false))
+  // 로그인/시작하기 모달 버튼 리스너 바인딩
+  const openAuthModal = (isSignup = false) => {
+    const authModal = document.querySelector('#auth-modal')
+    const loginForm = document.querySelector('#form-local-login')
+    const signupForm = document.querySelector('#form-local-signup')
+    const modalTitle = document.querySelector('#modal-title')
+    const modalDesc = document.querySelector('#modal-desc')
+    
+    if (isSignup) {
+      loginForm?.classList.add('hidden')
+      signupForm?.classList.remove('hidden')
+      if (modalTitle) modalTitle.textContent = '이메일 회원가입'
+      if (modalDesc) modalDesc.textContent = '간단한 가입으로 나만의 1:1 밥친구를 찾아보세요.'
+    } else {
+      loginForm?.classList.remove('hidden')
+      signupForm?.classList.add('hidden')
+      if (modalTitle) modalTitle.textContent = '마주한끼 시작하기'
+      if (modalDesc) modalDesc.textContent = '혼밥 말고 따뜻한 한 끼를 함께할 친구를 만나보세요.'
+    }
+    
+    if (authModal) {
+      authModal.style.display = 'grid'
+      authModal.offsetHeight
+      authModal.classList.add('is-open')
+      authModal.setAttribute('aria-hidden', 'false')
+    }
+  }
+
+  const btnHeaderLogin = document.querySelector('#btn-header-login')
+  if (btnHeaderLogin && !btnHeaderLogin.dataset.bound) {
+    btnHeaderLogin.dataset.bound = 'true'
+    btnHeaderLogin.addEventListener('click', () => openAuthModal(false))
+  }
+
+  const btnHeaderStart = document.querySelector('#btn-header-start')
+  if (btnHeaderStart && !btnHeaderStart.dataset.bound) {
+    btnHeaderStart.dataset.bound = 'true'
+    btnHeaderStart.addEventListener('click', () => openAuthModal(false))
   }
 }
 
