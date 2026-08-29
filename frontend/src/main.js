@@ -1,5 +1,5 @@
 import './style.css'
-import { startKakaoLogin, startGoogleLogin, login, logout, signUp } from './auth/auth-api.js'
+import { startKakaoLogin, startGoogleLogin, login, logout, signUp, installAuthFetchInterceptor, restoreAuthSession } from './auth/auth-api.js'
 import { clearAccessToken, getAccessToken } from './auth/token-storage.js'
 import { renderOAuthCallback } from './pages/oauth-callback.js'
 import { renderPreferredRegionPage } from './pages/preferred-region.js'
@@ -135,13 +135,16 @@ const routeApp = async () => {
     } else {
       // 기본 메인 랜딩 페이지
       initLandingPage()
+      showPendingLoginMessage()
     }
     
     // 헤더 상태 동기화
+    if (!isCurrentRoute()) return
     initCommonHeader()
   }
 
   // 라우팅이 완료되면 임시 감춤 상태 해제
+  if (!isCurrentRoute()) return
   document.documentElement.classList.remove('route-loading')
   document.documentElement.classList.remove('is-oauth-callback')
 }
