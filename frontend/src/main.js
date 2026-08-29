@@ -333,6 +333,14 @@ function initLandingPage() {
 }
 
 // 메인 헤더 및 온보딩 연동 처리
+function showPendingLoginMessage() {
+  const message = sessionStorage.getItem('project2.loginMessage')
+  if (!message) return
+
+  sessionStorage.removeItem('project2.loginMessage')
+  showToast(message)
+}
+
 function initCommonHeader() {
   const headerAuth = document.querySelector('#header-auth')
   if (!headerAuth) return
