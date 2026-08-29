@@ -1,7 +1,7 @@
 import { API_BASE_URL, regionTree } from '../main.js'
 import { getAccessToken } from '../auth/token-storage.js'
 
-export async function renderPreferredRegionPage(container) {
+export async function renderPreferredRegionPage(container, isCurrentRoute = () => true) {
   // 위치 기반 서비스 이용 동의 여부 체크
   const checkLocationConsent = async () => {
     const token = getAccessToken()
@@ -93,6 +93,7 @@ export async function renderPreferredRegionPage(container) {
   }
 
   await checkLocationConsent()
+  if (!isCurrentRoute()) return
 
   let initialLat = 37.5662
   let initialLng = 126.9016
@@ -104,6 +105,7 @@ export async function renderPreferredRegionPage(container) {
 
   try {
     const resp = await fetch(`${API_BASE_URL}/users/me/preferred-region`, { credentials: 'include' })
+    if (!isCurrentRoute()) return
     if (resp.ok) {
       const body = await resp.json()
       if (body && body.success && body.data) {
@@ -131,6 +133,7 @@ export async function renderPreferredRegionPage(container) {
     console.error('선호지역 조회 오류:', e)
   }
 
+  if (!isCurrentRoute()) return
   container.innerHTML = `
     <main class="max-w-[1440px] mx-auto px-margin-mobile md:px-margin-desktop py-8 flex flex-col gap-6 w-full">
       <!-- 타이틀 바 -->

@@ -10,7 +10,7 @@ let lastValidSigungu = ''
 let lastValidDetail = ''
 let lastValidRegionCode = ''
 
-export async function renderMatchMapPage(container) {
+export async function renderMatchMapPage(container, isCurrentRoute = () => true) {
   let preferredRegion = null
 
   // 위치 기반 서비스 이용 동의 여부 체크
@@ -105,6 +105,7 @@ export async function renderMatchMapPage(container) {
   }
 
   await checkLocationConsent()
+  if (!isCurrentRoute()) return
 
   const params = new URLSearchParams(window.location.search)
   

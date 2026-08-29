@@ -1,5 +1,5 @@
 import './style.css'
-import { startKakaoLogin, startGoogleLogin, login, logout, signUp } from './auth/auth-api.js'
+import { startKakaoLogin, startGoogleLogin, login, logout, signUp, installAuthFetchInterceptor, restoreAuthSession } from './auth/auth-api.js'
 import { clearAccessToken, getAccessToken } from './auth/token-storage.js'
 import { renderOAuthCallback } from './pages/oauth-callback.js'
 import { renderPreferredRegionPage } from './pages/preferred-region.js'
@@ -9,6 +9,7 @@ import { renderChatPage } from './pages/chat.js'
 import { renderMatchingRequestPage } from './pages/matching-request.js'
 
 const app = document.querySelector('#app')
+const initialLandingPageHtml = app?.innerHTML ?? ''
 
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080').replace(/\/$/, '')
 
@@ -81,6 +82,7 @@ const loadRegions = async () => {
 
 // 비동기 행정구역 로드 프로미스
 const regionsPromise = loadRegions()
+let activeRouteId = 0
 
 // SPA 라우팅 네비게이션 함수
 export function navigateTo(path) {
@@ -94,6 +96,8 @@ export function navigateTo(path) {
 
 // 라우터 분기 로직
 const routeApp = async () => {
+  const routeId = ++activeRouteId
+  const isCurrentRoute = () => routeId === activeRouteId
   if (typeof window.__matchingRequestCleanup === 'function') {
     const cleanup = window.__matchingRequestCleanup
     delete window.__matchingRequestCleanup
@@ -120,10 +124,11 @@ const routeApp = async () => {
       renderProfileSetup(app)
     } else if (path === '/map') {
       await regionsPromise // 지도 관련 페이지 진입 시에만 데이터를 기다림
+      if (!isCurrentRoute()) return
       if (params.get('mode') === 'preferred') {
-        await renderPreferredRegionPage(app)
+        await renderPreferredRegionPage(app, isCurrentRoute)
       } else {
-        await renderMatchMapPage(app)
+        await renderMatchMapPage(app, isCurrentRoute)
       }
     } else if (path === '/personality/survey') {
       renderPersonalitySurvey(app)
@@ -135,13 +140,16 @@ const routeApp = async () => {
     } else {
       // 기본 메인 랜딩 페이지
       initLandingPage()
+      showPendingLoginMessage()
     }
     
     // 헤더 상태 동기화
+    if (!isCurrentRoute()) return
     initCommonHeader()
   }
 
   // 라우팅이 완료되면 임시 감춤 상태 해제
+  if (!isCurrentRoute()) return
   document.documentElement.classList.remove('route-loading')
   document.documentElement.classList.remove('is-oauth-callback')
 }
@@ -151,6 +159,8 @@ window.addEventListener('popstate', routeApp)
 
 // 앱 초기 진입점
 const initApp = async () => {
+  installAuthFetchInterceptor()
+  await restoreAuthSession()
   routeApp() // 즉시 메인 페이지 및 헤더 상태를 렌더링
   await regionsPromise
 }
@@ -158,6 +168,11 @@ const initApp = async () => {
 initApp()
 
 function initLandingPage() {
+  // 다른 SPA 페이지가 #app 내용을 교체했으므로 루트 진입 시 랜딩 화면을 복원한다.
+  if (!app.querySelector('.default-landing-content')) {
+    app.innerHTML = initialLandingPageHtml
+  }
+
   const token = getAccessToken()
   const btnHeroMatch = document.querySelector('#btn-hero-match')
   const btnRegisterPreferred = document.querySelector('#btn-register-preferred')
@@ -318,6 +333,14 @@ function initLandingPage() {
 }
 
 // 메인 헤더 및 온보딩 연동 처리
+function showPendingLoginMessage() {
+  const message = sessionStorage.getItem('project2.loginMessage')
+  if (!message) return
+
+  sessionStorage.removeItem('project2.loginMessage')
+  showToast(message)
+}
+
 function initCommonHeader() {
   const headerAuth = document.querySelector('#header-auth')
   if (!headerAuth) return

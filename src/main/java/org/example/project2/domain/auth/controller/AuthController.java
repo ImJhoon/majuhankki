@@ -27,8 +27,10 @@ import org.example.project2.domain.auth.service.local.AuthService;
 import org.example.project2.domain.auth.service.oauth.OAuthTokenExchangeService;
 import org.example.project2.domain.auth.service.token.RefreshTokenService;
 import org.example.project2.global.common.CommonResponse;
+import org.example.project2.global.security.AuthProperties;
 import org.example.project2.global.security.handler.SecurityErrorResponse;
 import org.example.project2.global.security.jwt.AuthCookieUtil;
+import org.example.project2.global.security.jwt.JwtProvider;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -48,6 +50,8 @@ public class AuthController {
     private final OAuthTokenExchangeService oauthTokenExchangeService;
     private final RefreshTokenService refreshTokenService;
     private final AuthCookieUtil authCookieUtil;
+    private final AuthProperties authProperties;
+    private final JwtProvider jwtProvider;
 
     @Operation(summary = "이메일 회원가입", description = "이메일, 비밀번호, 닉네임을 받아 새로운 로컬 회원으로 등록합니다.")
     @Parameters({
@@ -176,6 +180,49 @@ public class AuthController {
     }
 
     @Operation(
+            summary = "Access Token 재발급",
+            description = "HttpOnly Refresh Token 쿠키를 검증하고 Access Token과 Refresh Token을 모두 재발급합니다."
+    )
+    @Parameters({
+            @Parameter(
+                    name = "X-XSRF-TOKEN",
+                    in = ParameterIn.HEADER,
+                    description = "GET /auth/csrf로 발급받은 XSRF-TOKEN 쿠키 값",
+                    required = true,
+                    schema = @Schema(type = "string")
+            )
+    })
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "토큰 재발급 성공"),
+            @ApiResponse(responseCode = "401", description = "Refresh Token이 만료되었거나 폐기됨",
+                    content = @Content(schema = @Schema(implementation = SecurityErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "CSRF 토큰 오류",
+                    content = @Content(schema = @Schema(implementation = SecurityErrorResponse.class)))
+    })
+    @PostMapping("/token/refresh")
+    public ResponseEntity<CommonResponse<LoginResponse>> refresh(
+            HttpServletRequest request,
+            HttpServletResponse response
+    ) {
+        String rawRefreshToken = extractRefreshToken(request);
+        RefreshTokenService.RotatedRefreshToken rotated = refreshTokenService.rotate(rawRefreshToken);
+        String accessToken = jwtProvider.issueToken(rotated.userId(), rotated.role());
+
+        response.addHeader(HttpHeaders.SET_COOKIE,
+                authCookieUtil.createAccessTokenCookie(accessToken).toString());
+        response.addHeader(HttpHeaders.SET_COOKIE,
+                authCookieUtil.deleteLegacyRefreshTokenCookie().toString());
+        response.addHeader(HttpHeaders.SET_COOKIE,
+                authCookieUtil.createRefreshTokenCookie(rotated.rawToken()).toString());
+
+        LoginResponse responseBody = new LoginResponse(
+                "Bearer",
+                authProperties.jwt().accessTokenExpiry().toSeconds()
+        );
+        return ResponseEntity.ok(CommonResponse.success(responseBody));
+    }
+
+    @Operation(
             summary = "로그아웃",
             description = "현재 Refresh Token을 폐기하고 브라우저의 인증 쿠키를 삭제합니다."
     )
@@ -220,6 +267,19 @@ public class AuthController {
                 .filter(token -> token != null && !token.isBlank())
                 .distinct()
                 .forEach(refreshTokenService::revoke);
+    }
+
+    private String extractRefreshToken(HttpServletRequest request) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            return Arrays.stream(cookies)
+                    .filter(cookie -> "refreshToken".equals(cookie.getName()))
+                    .map(Cookie::getValue)
+                    .filter(token -> token != null && !token.isBlank())
+                    .findFirst()
+                    .orElse(null);
+        }
+        return null;
     }
 
     @Schema(name = "SignUpSuccessResponse")
