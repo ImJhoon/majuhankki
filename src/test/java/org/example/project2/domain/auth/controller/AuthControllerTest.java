@@ -222,6 +222,38 @@ class AuthControllerTest {
     }
 
     @Test
+    void refreshRotatesRefreshTokenAndSetsNewAccessTokenCookie() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(refreshTokenService.rotate("refresh-token"))
+                .thenReturn(new RefreshTokenService.RotatedRefreshToken(
+                        "rotated-refresh-token",
+                        java.time.Instant.now().plusSeconds(60),
+                        userId,
+                        UserRole.USER
+                ));
+        when(authCookieUtil.createAccessTokenCookie(any(String.class)))
+                .thenReturn(ResponseCookie.from("accessToken", "new-access-token")
+                        .httpOnly(true).secure(false).sameSite("Lax").path("/").build());
+        when(authCookieUtil.createRefreshTokenCookie("rotated-refresh-token"))
+                .thenReturn(ResponseCookie.from("refreshToken", "rotated-refresh-token")
+                        .httpOnly(true).secure(false).sameSite("Lax").path("/").build());
+        when(authCookieUtil.deleteLegacyRefreshTokenCookie())
+                .thenReturn(ResponseCookie.from("refreshToken", "")
+                        .httpOnly(true).secure(false).sameSite("Lax").path("/auth").maxAge(0).build());
+
+        mockMvc.perform(post("/auth/token/refresh")
+                        .with(csrf())
+                        .cookie(new jakarta.servlet.http.Cookie("refreshToken", "refresh-token")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.data.expiresIn").value(900));
+
+        verify(refreshTokenService).rotate("refresh-token");
+        verify(authCookieUtil).createAccessTokenCookie(any(String.class));
+        verify(authCookieUtil).createRefreshTokenCookie("rotated-refresh-token");
+    }
+
+    @Test
     void logoutRevokesRefreshTokenAndDeletesCookie() throws Exception {
         String accessToken = jwtProvider.issueToken(UUID.randomUUID(), UserRole.USER);
         when(authCookieUtil.deleteRefreshTokenCookie())
