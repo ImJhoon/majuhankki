@@ -42,3 +42,5 @@ out/
 
 ### personal_docs ###
 docs/personal
+.tmp
+.codex
