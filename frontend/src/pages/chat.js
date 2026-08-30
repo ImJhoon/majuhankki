@@ -1,8 +1,9 @@
 import { getAccessToken } from '../auth/token-storage.js'
 import { navigateTo } from '../main.js'
+import { getLatestMatchResult } from '../matching/matching-api.js'
 
 /**
- * 채팅 테스트 페이지.
+ * 채팅 페이지 (카카오톡 스타일 UI)
  * - project2.isLoggedIn 이 true 인 경우에만 접근 가능
  * - STOMP CONNECT 헤더에 JWT 쿠키를 포함 (HttpOnly 쿠키는 브라우저가 자동 전송)
  * - /app/chat/{roomId}/send 로 전송, /topic/chat/{roomId} 구독
@@ -15,33 +16,48 @@ export function renderChatPage(container) {
   }
 
   container.innerHTML = `
-    <main style="max-width:600px; margin:40px auto; padding:0 16px;">
-      <h2>채팅 테스트</h2>
-      <p><button id="btn-back" style="cursor:pointer;">← 뒤로가기</button></p>
-      <hr>
-
-      <div>
-        <b>로그인 유저 ID:</b> <span id="disp-user-id">불러오는 중...</span><br>
-        <b>채팅방 ID:</b>       <span id="disp-room-id">-</span><br>
-        <b>연결 상태:</b>       <span id="disp-status">미연결</span>
+    <main class="max-w-2xl mx-auto my-6 px-4 flex flex-col min-h-[600px]">
+      <!-- Header -->
+      <div class="flex items-center justify-between border-b border-slate-200 pb-4 mb-4">
+        <div>
+          <h2 class="text-2xl font-extrabold text-brand-navy">1:1 실시간 채팅</h2>
+          <p class="text-xs text-secondary mt-1">상태: <span id="disp-status" class="font-bold text-slate-500">미연결</span></p>
+        </div>
+        <button id="btn-back" class="btn-secondary px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1">
+          <span class="material-symbols-outlined text-sm">arrow_back</span>
+          뒤로가기
+        </button>
       </div>
-      <hr>
 
-      <div>
-        <label>채팅방 ID: <input type="number" id="room-id-input" value="1" min="1" style="width:80px;"></label>
-        <button id="btn-connect">채팅방 입장</button>
-        <button id="btn-disconnect" disabled>연결 끊기</button>
+      <!-- Room Info & Controls -->
+      <div class="bg-surface-container-low rounded-2xl p-4 mb-4 border border-outline-variant/30 flex flex-wrap gap-4 items-center justify-between shadow-soft">
+        <div class="text-xs space-y-1 text-secondary">
+          <div><b>나의 ID:</b> <span id="disp-user-id" class="font-mono text-slate-600">불러오는 중...</span></div>
+          <div><b>상대방 닉네임:</b> <span id="disp-partner-nickname" class="font-bold text-brand-navy">상대방</span></div>
+          <div><b>채팅방 ID:</b> <span id="disp-room-id" class="font-bold text-brand-navy">-</span></div>
+        </div>
+        <div class="flex gap-2">
+          <input type="number" id="room-id-input" value="1" min="1" class="w-16 bg-white border border-outline-variant/40 rounded-xl px-2 py-1 text-sm focus:ring-2 focus:ring-primary-container outline-none" />
+          <button id="btn-connect" class="btn-primary px-4 py-1.5 rounded-full text-xs font-bold shadow-sm">채팅방 입장</button>
+          <button id="btn-disconnect" disabled class="btn-secondary px-4 py-1.5 rounded-full text-xs font-bold disabled:opacity-50">연결 끊기</button>
+        </div>
       </div>
-      <br>
 
-      <div>
-        <input type="text" id="msg-input" placeholder="메시지 입력" style="width:300px;" disabled>
-        <button id="btn-send" disabled>전송</button>
+      <!-- KakaoTalk Style Chat Window -->
+      <div class="flex flex-col h-[550px] border border-outline-variant/30 rounded-card overflow-hidden shadow-floating bg-[#BACEE0]">
+        <!-- Messages Area -->
+        <div id="chat-box" class="flex-grow overflow-y-auto p-4 space-y-4">
+          <div class="text-center my-2 text-xs text-slate-600 bg-white/40 rounded-full px-4 py-1 w-fit mx-auto shadow-sm">
+             채팅방에 입장해 주세요.
+          </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="bg-white border-t border-slate-200 p-3 flex gap-2">
+          <input type="text" id="msg-input" placeholder="메시지를 입력하세요..." disabled class="flex-grow bg-slate-100 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-container outline-none" />
+          <button id="btn-send" disabled class="btn-primary px-5 py-2 rounded-xl text-sm font-bold shadow-md disabled:opacity-50 disabled:cursor-not-allowed">전송</button>
+        </div>
       </div>
-      <br>
-
-      <b>채팅 내역</b>
-      <div id="chat-box" style="border:1px solid #aaa; height:300px; overflow-y:scroll; padding:8px; background:#fafafa;"></div>
     </main>
   `
 
@@ -54,6 +70,24 @@ export function renderChatPage(container) {
   let stompClient  = null
   let subscription = null
   let myUserId     = null
+  let partnerNickname = '상대방'
+  let partnerUserId = null
+  let partnerProfileImg = null
+
+  // ── 상대방 닉네임 가져오기 ──────────────────────────────────────────────────
+  getLatestMatchResult()
+    .then(result => {
+      if (result && result.partner) {
+        partnerNickname = result.partner.nickname || '상대방'
+        partnerUserId = result.partner.userId
+        partnerProfileImg = result.partner.profileImageUrl
+        const partnerNameEl = document.getElementById('disp-partner-nickname')
+        if (partnerNameEl) {
+          partnerNameEl.textContent = partnerNickname
+        }
+      }
+    })
+    .catch(() => {})
 
   // ── 현재 유저 ID 조회 (/users/me) ──────────────────────────────────────────
   fetch('/users/me', { credentials: 'include' })
@@ -70,14 +104,62 @@ export function renderChatPage(container) {
       document.getElementById('disp-user-id').textContent = '(조회 실패)'
     })
 
-  // ── 로그 출력 ──────────────────────────────────────────────────────────────
-  function log(text, color) {
-    const box  = document.getElementById('chat-box')
+  // ── 카카오톡 스타일 말풍선 렌더링 ──────────────────────────────────────────────
+  function appendChatMessage(senderId, nickname, message, isMine) {
+    const box = document.getElementById('chat-box')
+    if (!box) return
+
+    const row = document.createElement('div')
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    
+    if (isMine) {
+      row.className = 'flex justify-end items-end gap-1.5 mb-1.5 w-full'
+      row.innerHTML = `
+        <span class="text-[9px] text-slate-600/80 mb-0.5 select-none">${timeStr}</span>
+        <div class="bg-[#FEE500] text-black text-sm p-2.5 rounded-l-2xl rounded-br-2xl max-w-[70%] shadow-sm whitespace-pre-wrap break-words border border-[#E4CE00]/30">${escapeHtml(message)}</div>
+      `
+    } else {
+      row.className = 'flex items-start gap-2.5 mb-1.5 w-full'
+      const initial = escapeHtml(nickname ? nickname.trim().charAt(0) : '상')
+      
+      const avatarHtml = partnerProfileImg
+        ? `<img src="${escapeHtml(partnerProfileImg)}" class="w-10 h-10 rounded-full object-cover shrink-0 shadow-sm border border-slate-200" alt="avatar" />`
+        : `<div class="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-brand-navy font-bold shrink-0 text-sm shadow-sm select-none">${initial}</div>`
+
+      row.innerHTML = `
+        ${avatarHtml}
+        <div class="flex flex-col">
+          <span class="text-[11px] text-slate-700 mb-0.5 font-semibold select-none">${escapeHtml(nickname || '상대방')}</span>
+          <div class="flex items-end gap-1.5">
+            <div class="bg-white text-black text-sm p-2.5 rounded-r-2xl rounded-bl-2xl max-w-[70%] shadow-sm whitespace-pre-wrap break-words border border-slate-200">${escapeHtml(message)}</div>
+            <span class="text-[9px] text-slate-600/80 mb-0.5 select-none">${timeStr}</span>
+          </div>
+        </div>
+      `
+    }
+
+    box.appendChild(row)
+    box.scrollTop = box.scrollHeight
+  }
+
+  function appendSystemMessage(text, color = 'slate-600') {
+    const box = document.getElementById('chat-box')
+    if (!box) return
+
     const line = document.createElement('div')
-    if (color) line.style.color = color
-    line.textContent = `[${new Date().toLocaleTimeString()}] ${text}`
+    line.className = `text-center my-2 text-xs text-${color} bg-white/40 rounded-full px-4 py-1.5 w-fit mx-auto shadow-sm select-none`
+    line.textContent = text
     box.appendChild(line)
     box.scrollTop = box.scrollHeight
+  }
+
+  function escapeHtml(str) {
+    if (!str) return ''
+    return str.replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&#039;')
   }
 
   // ── CONNECT + SUBSCRIBE ────────────────────────────────────────────────────
@@ -86,12 +168,11 @@ export function renderChatPage(container) {
     document.getElementById('disp-room-id').textContent = roomId
     document.getElementById('disp-status').textContent  = '연결 중...'
 
-    // SockJS + STOMP (CDN 전역 객체 사용)
     const SockJS = window.SockJS
     const Stomp  = window.Stomp
 
     if (!SockJS || !Stomp) {
-      log('SockJS / STOMP 라이브러리가 로드되지 않았습니다.', 'red')
+      appendSystemMessage('SockJS / STOMP 라이브러리가 로드되지 않았습니다.', 'red-700')
       return
     }
 
@@ -99,10 +180,8 @@ export function renderChatPage(container) {
     stompClient  = Stomp.over(socket)
     stompClient.debug = null
 
-    // CONNECT: 쿠키 기반 인증 (HttpOnly JWT 쿠키는 브라우저가 자동 전송)
-    // 서버의 ChatSubscriptionInterceptor 가 CONNECT 프레임 헤더를 읽음
     stompClient.connect({}, function () {
-      log('연결 성공!', 'green')
+      appendSystemMessage('채팅방 연결 성공!', 'green-700')
       document.getElementById('disp-status').textContent = '연결됨'
       document.getElementById('btn-connect').disabled    = true
       document.getElementById('btn-disconnect').disabled = false
@@ -111,17 +190,15 @@ export function renderChatPage(container) {
       subscription = stompClient.subscribe(`/topic/chat/${roomId}`, function (msg) {
         const body   = JSON.parse(msg.body)
         const isMine = body.sender === myUserId
-        log(
-          (isMine ? '▶ 나' : `◀ ${body.sender}`) + ': ' + body.message,
-          isMine ? 'blue' : 'black'
-        )
+        const nickname = isMine ? '나' : (body.sender === partnerUserId ? partnerNickname : '상대방')
+        appendChatMessage(body.sender, nickname, body.message, isMine)
       })
 
-      log(`채팅방 ${roomId} 입장 완료.`)
+      appendSystemMessage(`채팅방 ${roomId}번에 입장하였습니다.`)
       document.getElementById('msg-input').disabled = false
       document.getElementById('btn-send').disabled  = false
     }, function (err) {
-      log('연결 실패: ' + err, 'red')
+      appendSystemMessage('연결 실패: ' + err, 'red-700')
       document.getElementById('disp-status').textContent = '연결 실패'
     })
   }
@@ -131,7 +208,7 @@ export function renderChatPage(container) {
     if (stompClient) {
       if (subscription) subscription.unsubscribe()
       stompClient.disconnect(() => {
-        log('연결 해제됨.', 'gray')
+        appendSystemMessage('채팅방 연결이 종료되었습니다.', 'slate-500')
         resetUI()
       })
     }

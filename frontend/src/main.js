@@ -302,12 +302,31 @@ function initLandingPage() {
 
   btnHeroMatch?.addEventListener('click', handleMatchStart)
 
-  // 채팅방 가기 버튼: project2.isLoggedIn === 'true' 일 때만 표시
+  // 채팅방 가기 버튼: project2.isLoggedIn === 'true' 이며 매칭이 완료된 경우에만 활성화
   const btnGoChat = document.querySelector('#btn-go-chat')
   if (sessionStorage.getItem('project2.isLoggedIn') === 'true') {
     btnGoChat?.classList.remove('hidden')
+    if (btnGoChat) {
+      btnGoChat.disabled = true
+      btnGoChat.classList.add('opacity-50', 'cursor-not-allowed')
+      btnGoChat.title = '매칭 완료 후에만 입장할 수 있습니다.'
+      
+      import('./matching/matching-api.js').then(({ getLatestMatchResult }) => {
+        getLatestMatchResult()
+          .then((result) => {
+            if (result && result.chatRoomId) {
+              btnGoChat.disabled = false
+              btnGoChat.classList.remove('opacity-50', 'cursor-not-allowed')
+              btnGoChat.title = ''
+              btnGoChat.addEventListener('click', () => navigateTo(`/chat?roomId=${result.chatRoomId}`))
+            }
+          })
+          .catch(() => {
+            // 매칭 정보가 없으면 비활성화 유지
+          })
+      })
+    }
   }
-  btnGoChat?.addEventListener('click', () => navigateTo('/chat'))
 
   if (sessionStorage.getItem('project2.isLoggedIn') === 'true') {
     btnRegisterPreferred?.classList.remove('hidden')
