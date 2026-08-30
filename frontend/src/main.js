@@ -304,28 +304,32 @@ function initLandingPage() {
 
   // 채팅방 가기 버튼: project2.isLoggedIn === 'true' 이며 매칭이 완료된 경우에만 활성화
   const btnGoChat = document.querySelector('#btn-go-chat')
-  if (sessionStorage.getItem('project2.isLoggedIn') === 'true') {
-    btnGoChat?.classList.remove('hidden')
-    if (btnGoChat) {
-      btnGoChat.disabled = true
-      btnGoChat.classList.add('opacity-50', 'cursor-not-allowed')
-      btnGoChat.title = '매칭 완료 후에만 입장할 수 있습니다.'
-      
-      import('./matching/matching-api.js').then(({ getLatestMatchResult }) => {
-        getLatestMatchResult()
-          .then((result) => {
-            if (result && result.chatRoomId) {
-              btnGoChat.disabled = false
-              btnGoChat.classList.remove('opacity-50', 'cursor-not-allowed')
-              btnGoChat.title = ''
-              btnGoChat.addEventListener('click', () => navigateTo(`/chat?roomId=${result.chatRoomId}`))
-            }
-          })
-          .catch(() => {
-            // 매칭 정보가 없으면 비활성화 유지
-          })
-      })
+  if (sessionStorage.getItem('project2.isLoggedIn') === 'true' && btnGoChat) {
+    const cachedMatchResult = readCachedMatchResult()
+
+    // 새로고침 직후에는 직전에 저장한 매칭 결과를 먼저 사용하여 버튼 깜빡임을 방지합니다.
+    if (cachedMatchResult) {
+      enableChatButton(btnGoChat, cachedMatchResult.chatRoomId)
     }
+
+    import('./matching/matching-api.js').then(({ getLatestMatchResult }) => {
+      getLatestMatchResult()
+        .then((result) => {
+          if (result && result.chatRoomId) {
+            sessionStorage.setItem('project2.latestMatchResult', JSON.stringify(result))
+            enableChatButton(btnGoChat, result.chatRoomId)
+          } else {
+            // 매칭되지 않은 사용자는 채팅방 버튼을 표시하지 않음
+            sessionStorage.removeItem('project2.latestMatchResult')
+            btnGoChat.disabled = true
+            btnGoChat.classList.add('hidden', 'chat-state-pending')
+          }
+        })
+        .catch(() => {
+          // 매칭 여부를 확인하지 못한 경우에도 안전하게 버튼을 숨김
+          if (!cachedMatchResult) btnGoChat.classList.add('hidden', 'chat-state-pending')
+        })
+    })
   }
 
   if (sessionStorage.getItem('project2.isLoggedIn') === 'true') {
@@ -349,6 +353,25 @@ function initLandingPage() {
       alert('민지 님의 식사 테이블에 참가 요청을 보냈습니다!')
     }
   })
+}
+
+function readCachedMatchResult() {
+  try {
+    const cached = JSON.parse(sessionStorage.getItem('project2.latestMatchResult') || 'null')
+    return cached?.chatRoomId ? cached : null
+  } catch {
+    sessionStorage.removeItem('project2.latestMatchResult')
+    return null
+  }
+}
+
+function enableChatButton(button, chatRoomId) {
+  button.disabled = false
+  button.classList.remove('opacity-50', 'cursor-not-allowed', 'hidden', 'chat-state-pending')
+  button.title = ''
+  if (button.dataset.chatRoomId === String(chatRoomId)) return
+  button.dataset.chatRoomId = String(chatRoomId)
+  button.addEventListener('click', () => navigateTo(`/chat?roomId=${chatRoomId}`))
 }
 
 // 메인 헤더 및 온보딩 연동 처리

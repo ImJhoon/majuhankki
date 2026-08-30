@@ -394,6 +394,7 @@ export async function renderMatchingRequestPage(container) {
 
   function applyMatchResult(payload) {
     state.latestResult = payload
+    sessionStorage.setItem('project2.latestMatchResult', JSON.stringify(payload))
     state.currentRequest = null
     state.currentProposal = null
     state.hasSubmittedRequest = false

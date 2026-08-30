@@ -13,4 +13,5 @@ export function getAccessToken() {
 export function clearAccessToken() {
   // 세션스토리지를 비워 로그아웃 상태로 전환합니다.
   sessionStorage.removeItem(LOGGED_IN_FLAG)
+  sessionStorage.removeItem('project2.latestMatchResult')
 }
