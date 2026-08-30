@@ -74,43 +74,16 @@ export function renderChatPage(container) {
   let partnerUserId = null
   let partnerProfileImg = null
 
-  // ── 상대방 닉네임 가져오기 ──────────────────────────────────────────────────
-  getLatestMatchResult()
-    .then(result => {
-      if (result && result.partner) {
-        partnerNickname = result.partner.nickname || '상대방'
-        partnerUserId = result.partner.userId
-        partnerProfileImg = result.partner.profileImageUrl
-        const partnerNameEl = document.getElementById('disp-partner-nickname')
-        if (partnerNameEl) {
-          partnerNameEl.textContent = partnerNickname
-        }
-      }
-    })
-    .catch(() => {})
-
-  // ── 현재 유저 ID 조회 (/users/me) ──────────────────────────────────────────
-  fetch('/users/me', { credentials: 'include' })
-    .then(r => r.json())
-    .then(body => {
-      if (body.success && body.data) {
-        myUserId = body.data.userId
-        document.getElementById('disp-user-id').textContent = myUserId
-      } else {
-        document.getElementById('disp-user-id').textContent = '(조회 실패)'
-      }
-    })
-    .catch(() => {
-      document.getElementById('disp-user-id').textContent = '(조회 실패)'
-    })
+  // ── 정보 초기화는 하단에서 Promise.all로 진행합니다. ──────────────────────────
 
   // ── 카카오톡 스타일 말풍선 렌더링 ──────────────────────────────────────────────
-  function appendChatMessage(senderId, nickname, message, isMine) {
+  function appendChatMessage(senderId, nickname, message, isMine, customTime = null) {
     const box = document.getElementById('chat-box')
     if (!box) return
 
     const row = document.createElement('div')
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    const timeVal = customTime ? new Date(customTime) : new Date()
+    const timeStr = timeVal.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     
     if (isMine) {
       row.className = 'flex justify-end items-end gap-1.5 mb-1.5 w-full'
@@ -186,7 +159,27 @@ export function renderChatPage(container) {
       document.getElementById('btn-connect').disabled    = true
       document.getElementById('btn-disconnect').disabled = false
 
-      // SUBSCRIBE
+      // 1. 이전 대화 내역 불러오기
+      fetch(`/chatrooms/${roomId}/messages?size=50`, { credentials: 'include' })
+        .then(r => r.json())
+        .then(body => {
+          if (body.success && body.data && body.data.content) {
+            const box = document.getElementById('chat-box')
+            if (box) box.innerHTML = '' // 초기 환영 메시지 삭제
+
+            body.data.content.forEach(msg => {
+              const isMine = msg.senderId === myUserId
+              const nickname = isMine ? '나' : (msg.senderId === partnerUserId ? partnerNickname : '상대방')
+              appendChatMessage(msg.senderId, nickname, msg.content, isMine, msg.sentAt)
+            })
+            appendSystemMessage('이전 대화 내역을 불러왔습니다.')
+          }
+        })
+        .catch(err => {
+          console.warn('이전 대화 내역 조회 실패:', err)
+        })
+
+      // 2. SUBSCRIBE (실시간 메시지 구독)
       subscription = stompClient.subscribe(`/topic/chat/${roomId}`, function (msg) {
         const body   = JSON.parse(msg.body)
         const isMine = body.sender === myUserId
@@ -249,7 +242,34 @@ export function renderChatPage(container) {
     if (e.key === 'Enter') sendMessage()
   })
 
-  if (/^\d+$/.test(roomIdFromQuery || '')) {
-    connect()
-  }
+  // ── 사용자 정보 및 매칭 파트너 정보 먼저 가져오기 ──────────────────────────
+  Promise.all([
+    fetch('/users/me', { credentials: 'include' })
+      .then(r => r.json())
+      .catch(() => null),
+    getLatestMatchResult()
+      .catch(() => null)
+  ]).then(([userBody, matchResult]) => {
+    if (userBody && userBody.success && userBody.data) {
+      myUserId = userBody.data.userId
+      document.getElementById('disp-user-id').textContent = myUserId
+    } else {
+      document.getElementById('disp-user-id').textContent = '(조회 실패)'
+    }
+
+    if (matchResult && matchResult.partner) {
+      partnerNickname = matchResult.partner.nickname || '상대방'
+      partnerUserId = matchResult.partner.userId
+      partnerProfileImg = matchResult.partner.profileImageUrl
+      const partnerNameEl = document.getElementById('disp-partner-nickname')
+      if (partnerNameEl) {
+        partnerNameEl.textContent = partnerNickname
+      }
+    }
+
+    // 정보를 다 확보한 상태에서 자동으로 입장 처리 진행
+    if (/^\d+$/.test(roomIdFromQuery || '')) {
+      connect()
+    }
+  })
 }
