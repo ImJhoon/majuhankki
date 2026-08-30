@@ -14,6 +14,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
+import org.example.project2.domain.chat.dto.ChatMessageListResponse;
+import java.util.List;
+import java.util.ArrayList;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.AccessDeniedException;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -22,6 +28,37 @@ public class ChatService {
     private final ChatMessageRepository chatMessageRepository;
     private final ChatRoomRepository chatRoomRepository;
     private final UserRepository userRepository;
+
+    /**
+     * 특정 채팅방의 이전 메시지 내역을 조회합니다 (커서 기반 페이지네이션).
+     */
+    public ChatMessageListResponse getPreviousMessages(Long roomId, Long cursor, int size, UUID userId) {
+        // 1. 해당 채팅방에 유저가 참여 중인지 검증
+        if (!chatRoomRepository.existsParticipantByRoomIdAndUserId(roomId, userId)) {
+            throw new AccessDeniedException("해당 채팅방에 접근할 권한이 없습니다.");
+        }
+
+        // 2. size + 1 개를 조회하여 다음 페이지 존재 여부 확인
+        PageRequest pageRequest = PageRequest.of(0, size + 1);
+        List<ChatMessage> messages = chatMessageRepository.findMessagesWithCursor(roomId, cursor, pageRequest);
+
+        boolean hasNext = messages.size() > size;
+        List<ChatMessage> resultList = hasNext ? messages.subList(0, size) : messages;
+
+        // 3. 시간 순서로 클라이언트가 보기 편하도록 역순(DESC)으로 조회된 리스트를 반대로 뒤집음
+        List<ChatMessageListResponse.MessageItem> items = new ArrayList<>();
+        for (int i = resultList.size() - 1; i >= 0; i--) {
+            ChatMessage msg = resultList.get(i);
+            items.add(new ChatMessageListResponse.MessageItem(
+                    msg.getId(),
+                    msg.getSender().getId(),
+                    msg.getContent(),
+                    msg.getCreatedAt()
+            ));
+        }
+
+        return new ChatMessageListResponse(items, hasNext);
+    }
 
     /**
      * 채팅 메시지를 DB에 영구 저장합니다.
