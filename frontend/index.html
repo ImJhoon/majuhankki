@@ -23,6 +23,15 @@
         const loggedIn = sessionStorage.getItem('project2.isLoggedIn') === 'true';
         document.documentElement.classList.add(loggedIn ? 'logged-in' : 'logged-out');
 
+        try {
+          const cachedMatch = JSON.parse(sessionStorage.getItem('project2.latestMatchResult') || 'null');
+          if (loggedIn && cachedMatch?.chatRoomId) {
+            document.documentElement.classList.add('has-cached-chat');
+          }
+        } catch {
+          sessionStorage.removeItem('project2.latestMatchResult');
+        }
+
         if (window.location.pathname !== '/') {
           document.documentElement.classList.add('route-loading');
         }
@@ -42,6 +51,12 @@
         display: none !important;
       }
       .logged-in .auth-only-button {
+        display: flex !important;
+      }
+      .logged-in #btn-go-chat.chat-state-pending {
+        display: none !important;
+      }
+      .logged-in.has-cached-chat #btn-go-chat.chat-state-pending {
         display: flex !important;
       }
       .route-loading .default-landing-content {
@@ -207,7 +222,7 @@
             <!-- Quick Match Box -->
             <div class="bg-surface-container-lowest p-3 sm:p-4 rounded-card shadow-soft flex flex-col sm:flex-row items-center gap-3 max-w-xl mx-auto lg:mx-0 border border-outline-variant/30">
               <!-- 채팅방 가기 버튼: 로그인 시에만 표시 -->
-              <button id="btn-go-chat" class="auth-only-button hidden w-full sm:w-auto btn-action-chat py-3 px-5 rounded-full text-sm shrink-0">
+              <button id="btn-go-chat" class="auth-only-button hidden chat-state-pending w-full sm:w-auto btn-action-chat py-3 px-5 rounded-full text-sm shrink-0">
                 <span class="material-symbols-outlined text-lg">chat</span>
                 <span>채팅방 가기</span>
               </button>
