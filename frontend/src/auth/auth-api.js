@@ -1,7 +1,7 @@
 import { saveAccessToken } from './token-storage.js'
 import { clearAccessToken } from './token-storage.js'
+import { API_BASE_URL } from '../config/api.js'
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 const nativeFetch = window.fetch.bind(window)
 let refreshPromise = null
 

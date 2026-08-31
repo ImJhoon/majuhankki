@@ -1,4 +1,4 @@
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+import { API_BASE_URL } from '../config/api.js'
 
 /**
  * 매칭 API 오류를 화면에서 상태 코드와 함께 처리하기 위한 오류 타입입니다.

@@ -42,9 +42,10 @@ import java.util.Map;
 
 @Configuration
 @RequiredArgsConstructor
-@EnableConfigurationProperties({AuthProperties.class, OAuthProperties.class})
+@EnableConfigurationProperties({AuthProperties.class, OAuthProperties.class, CookieProperties.class})
 public class SecurityConfig {
     private final AuthProperties p;
+    private final CookieProperties cookieProperties;
     private final JwtFilter jwtFilter;
     private final CsrfCookieFilter csrfCookieFilter;
     private final SpaCsrfTokenRequestHandler csrfTokenRequestHandler;
@@ -107,9 +108,9 @@ public class SecurityConfig {
     public CookieCsrfTokenRepository csrfTokenRepository() {
         CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         repository.setCookieCustomizer(cookie -> cookie
-                .secure(false) // 로컬 HTTP 테스트를 위해 false로 설정
-                .sameSite("Lax") // 크로스 오리진 요청 간 전송을 위해 Lax로 완화
-                .path("/")); // Refresh Token 쿠키를 인증 관련 경로에만 전송
+                .secure(cookieProperties.secure())
+                .sameSite(cookieProperties.sameSite())
+                .path("/")); // CSRF 쿠키는 모든 API 경로에 전송
         return repository;
     }
 

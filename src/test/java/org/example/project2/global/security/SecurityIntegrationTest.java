@@ -53,7 +53,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
                 "app.auth.jwt.access-token-expiry=15m",
                 "app.auth.jwt.refresh-token-expiry=14d",
                 "app.auth.jwt.max-active-sessions=5",
-                "app.auth.cors.allowed-origin=https://frontend.example"
+                "app.auth.cors.allowed-origin=https://frontend.example",
+                "app.security.cookie.secure=false",
+                "app.security.cookie.same-site=Lax"
         }
 )
 @Import({

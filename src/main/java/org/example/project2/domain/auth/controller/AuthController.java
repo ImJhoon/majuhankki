@@ -140,7 +140,7 @@ public class AuthController {
                     headers = @Header(
                             name = "Set-Cookie",
                             description = "Secure/HttpOnly Access/Refresh Token 쿠키",
-                            schema = @Schema(type = "string", example = "refreshToken=...; Path=/; Secure; HttpOnly; SameSite=Strict")
+                            schema = @Schema(type = "string", example = "refreshToken=...; Path=/; Secure; HttpOnly; SameSite=None")
                     ),
                     content = @Content(schema = @Schema(implementation = OAuthTokenExchangeSuccessResponse.class))
             ),

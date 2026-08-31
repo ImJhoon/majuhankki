@@ -12,6 +12,12 @@ springdoc:
       cookie-name: XSRF-TOKEN
       header-name: X-XSRF-TOKEN
 
+app:
+  security:
+    cookie:
+      secure: false
+      same-site: Lax
+
 management:
   endpoints:
     web:

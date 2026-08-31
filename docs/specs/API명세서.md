@@ -138,7 +138,7 @@
 }
 ```
 
-Refresh Token 원문은 응답 본문에 포함하지 않고 `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/` 쿠키로만 전달한다. 과거 `Path=/auth`로 발급된 동명 쿠키는 로그인과 로그아웃 응답에서 만료시켜 중복 전송을 방지한다.
+Refresh Token 원문은 응답 본문에 포함하지 않고 `HttpOnly`, `Path=/` 쿠키로만 전달한다. 개발 프로필에서는 로컬 HTTP 테스트를 위해 `Secure=false`, `SameSite=Lax`를 사용하고, 운영 프로필에서는 Cloudflare Pages와 Render 간 요청을 위해 `Secure=true`, `SameSite=None`을 사용한다. 과거 `Path=/auth`로 발급된 동명 쿠키는 로그인과 로그아웃 응답에서 만료시켜 중복 전송을 방지한다.
 
 **POST /auth/token/refresh**
 
@@ -176,7 +176,7 @@ OAuth2 로그인 시작과 콜백 경로(`/oauth2/**`, `/login/oauth2/**`)는 �
 { "code": "OAuth 콜백에서 전달받은 일회성 코드" }
 ```
 
-서버는 Redis에서 코드를 조회하는 동시에 삭제하여 한 번만 사용할 수 있도록 보장한다. 만료되었거나 이미 사용한 코드는 `401 AUTH_001`로 처리한다. 교환 성공 시 응답은 다음과 같으며, Refresh Token은 일반 로그인과 동일하게 응답 본문이 아닌 `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/` 쿠키로만 전달한다.
+서버는 Redis에서 코드를 조회하는 동시에 삭제하여 한 번만 사용할 수 있도록 보장한다. 만료되었거나 이미 사용한 코드는 `401 AUTH_001`로 처리한다. 교환 성공 시 응답은 다음과 같으며, Refresh Token은 일반 로그인과 동일하게 응답 본문이 아닌 `HttpOnly`, `Path=/` 쿠키로만 전달한다. 쿠키의 `SameSite`와 `Secure` 속성은 활성 프로필에 따라 적용한다.
 
 ```json
 {

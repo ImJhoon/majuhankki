@@ -7,11 +7,12 @@ import { renderMatchMapPage } from './pages/match-map.js'
 import { renderPersonalitySurvey } from './pages/personality-survey.js'
 import { renderChatPage } from './pages/chat.js'
 import { renderMatchingRequestPage } from './pages/matching-request.js'
+import { API_BASE_URL } from './config/api.js'
 
 const app = document.querySelector('#app')
 const initialLandingPageHtml = app?.innerHTML ?? ''
 
-export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080').replace(/\/$/, '')
+export { API_BASE_URL }
 
 // 행정구역 트리 (pages/ 모듈과 공유)
 export let regionTree = {}

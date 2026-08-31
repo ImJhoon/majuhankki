@@ -1,6 +1,7 @@
 import { getAccessToken } from '../auth/token-storage.js'
 import { navigateTo } from '../main.js'
 import { getLatestMatchResult } from '../matching/matching-api.js'
+import { API_BASE_URL } from '../config/api.js'
 
 /**
  * 채팅 페이지 (카카오톡 스타일 UI)
@@ -135,7 +136,7 @@ export function renderChatPage(container) {
       return
     }
 
-    const socket = new SockJS('/ws-chat')
+    const socket = new SockJS(`${API_BASE_URL}/ws-chat`)
     stompClient  = Stomp.over(socket)
     stompClient.debug = null
 
@@ -147,7 +148,7 @@ export function renderChatPage(container) {
       if (btnEndMatch) btnEndMatch.disabled = false
 
       // 1. 이전 대화 내역 불러오기
-      fetch(`/chatrooms/${roomId}/messages?size=50`, { credentials: 'include' })
+      fetch(`${API_BASE_URL}/chatrooms/${roomId}/messages?size=50`, { credentials: 'include' })
         .then(r => r.json())
         .then(body => {
           if (body.success && body.data && body.data.content) {
@@ -236,7 +237,7 @@ export function renderChatPage(container) {
     if (!confirm('정말로 매칭을 종료하시겠습니까?\n종료 시 상대방과의 채팅방도 함께 폐쇄됩니다.')) return
 
     try {
-      const csrfResp = await fetch('/auth/csrf', { credentials: 'include' })
+      const csrfResp = await fetch(`${API_BASE_URL}/auth/csrf`, { credentials: 'include' })
       if (!csrfResp.ok) throw new Error('CSRF 토큰 발급에 실패했습니다.')
 
       const readCookie = (name) => {
@@ -249,8 +250,8 @@ export function renderChatPage(container) {
       const csrfToken = readCookie('XSRF-TOKEN')
 
       const url = matchId
-        ? `/matches/${matchId}/end`
-        : `/matches/chatroom/${targetRoomId}/end`
+        ? `${API_BASE_URL}/matches/${matchId}/end`
+        : `${API_BASE_URL}/matches/chatroom/${targetRoomId}/end`
 
       const resp = await fetch(url, {
         method: 'PATCH',
@@ -275,7 +276,7 @@ export function renderChatPage(container) {
 
   // ── 사용자 정보 및 매칭 파트너 정보 먼저 가져오기 ──────────────────────────
   Promise.all([
-    fetch('/users/me', { credentials: 'include' })
+    fetch(`${API_BASE_URL}/users/me`, { credentials: 'include' })
       .then(r => r.json())
       .catch(() => null),
     getLatestMatchResult()
