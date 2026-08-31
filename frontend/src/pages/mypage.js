@@ -122,7 +122,7 @@ export async function renderMyPage(container) {
 
         if (resp.ok) {
           alert('위치 정보 이용 동의가 철회되고 데이터가 영구 파기되었습니다.')
-          navigateTo('/')
+          navigateTo('/mypage')
         } else {
           alert('동의 철회 처리에 실패했습니다.')
         }
