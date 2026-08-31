@@ -12,7 +12,7 @@ export async function renderMyPage(container) {
     <main class="max-w-4xl mx-auto px-margin-mobile md:px-margin-desktop py-12 flex-grow">
       <div class="bg-surface-container-lowest rounded-card p-6 md:p-8 shadow-soft border border-outline-variant/20 mb-8">
         <div class="flex flex-col sm:flex-row items-center gap-6 border-b border-outline-variant/20 pb-6 mb-6">
-          
+
           <!-- 프로필 이미지 컨테이너 (카메라 아이콘 탑재) -->
           <div class="relative group">
             <div class="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-md bg-slate-100 flex items-center justify-center flex-shrink-0">
@@ -135,7 +135,7 @@ export async function renderMyPage(container) {
       if (body.success && body.data) {
         cachedUserId = body.data.userId
         cachedNickname = body.data.nickname
-        
+
         document.querySelector('#mypage-user-nickname').textContent = body.data.nickname
         document.querySelector('#mypage-user-email').textContent = body.data.email
         if (body.data.profileImageUrl) {
@@ -253,11 +253,11 @@ export async function renderMyPage(container) {
         if (body.success && body.data) {
           cachedNickname = body.data.nickname
           document.querySelector('#mypage-user-nickname').textContent = cachedNickname
-          
+
           // 헤더 닉네임 실시간 동기화
           const headerNickname = document.querySelector('#header-user-nickname')
           if (headerNickname) headerNickname.textContent = cachedNickname
-          
+
           nicknameDisplayWrapper.classList.remove('hidden')
           nicknameEditWrapper.classList.add('hidden')
           alert('닉네임이 성공적으로 변경되었습니다.')
@@ -320,11 +320,11 @@ export async function renderMyPage(container) {
         if (body.success && body.data) {
           const newUrl = body.data.profileImageUrl
           document.querySelector('#mypage-user-profile-img').src = newUrl
-          
+
           // 헤더 프로필 이미지 동기화
           const headerProfileImg = document.querySelector('#header-user-profile-img')
           if (headerProfileImg) headerProfileImg.src = newUrl
-          
+
           alert('프로필 사진이 성공적으로 변경되었습니다.')
         }
       } else {

@@ -32,12 +32,12 @@ public class MatchEndService {
     public void endByRoomId(UUID userId, Long roomId) {
         ChatRoom chatRoom = chatRoomRepository.findById(roomId)
                 .orElseThrow(() -> new IllegalArgumentException("채팅방을 찾을 수 없습니다."));
-        
+
         Match match = chatRoom.getMatch();
         if (match == null) {
             throw new IllegalArgumentException("채팅방에 연결된 매칭 정보를 찾을 수 없습니다.");
         }
-        
+
         Match validMatch = matchRepository.findByIdAndParticipantUserId(match.getId(), userId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 매칭에 종료 권한이 없습니다."));
 

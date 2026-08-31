@@ -142,7 +142,7 @@ export function renderChatPage(container) {
     stompClient.connect({}, function () {
       appendSystemMessage('채팅방 연결 성공!', 'green-700')
       document.getElementById('disp-status').textContent = '연결됨'
-      
+
       const btnEndMatch = document.getElementById('btn-end-match')
       if (btnEndMatch) btnEndMatch.disabled = false
 
@@ -238,7 +238,7 @@ export function renderChatPage(container) {
     try {
       const csrfResp = await fetch('/auth/csrf', { credentials: 'include' })
       if (!csrfResp.ok) throw new Error('CSRF 토큰 발급에 실패했습니다.')
-      
+
       const readCookie = (name) => {
         const prefix = `${encodeURIComponent(name)}=`
         const cookie = document.cookie
@@ -248,8 +248,8 @@ export function renderChatPage(container) {
       }
       const csrfToken = readCookie('XSRF-TOKEN')
 
-      const url = matchId 
-        ? `/matches/${matchId}/end` 
+      const url = matchId
+        ? `/matches/${matchId}/end`
         : `/matches/chatroom/${targetRoomId}/end`
 
       const resp = await fetch(url, {
