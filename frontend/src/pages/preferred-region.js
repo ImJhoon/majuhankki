@@ -1,5 +1,6 @@
 import { API_BASE_URL, regionTree, navigateTo } from '../main.js'
 import { getAccessToken } from '../auth/token-storage.js'
+import { getCsrfToken } from '../auth/csrf.js'
 
 export async function renderPreferredRegionPage(container, isCurrentRoute = () => true) {
   // 위치 기반 서비스 이용 동의 여부 체크
@@ -66,11 +67,7 @@ export async function renderPreferredRegionPage(container, isCurrentRoute = () =
 
       btnSubmit.addEventListener('click', async () => {
         try {
-          const csrfResp = await fetch(`${API_BASE_URL}/auth/csrf`, { credentials: 'include' })
-          if (!csrfResp.ok) throw new Error('CSRF 토큰 발급에 실패했습니다.')
-          const prefix = encodeURIComponent('XSRF-TOKEN') + '='
-          const csrfCookie = document.cookie.split('; ').find(c => c.startsWith(prefix))
-          const csrfToken = csrfCookie ? decodeURIComponent(csrfCookie.slice(prefix.length)) : null
+          const csrfToken = await getCsrfToken()
 
           const resp = await fetch(`${API_BASE_URL}/users/me/preferred-region`, {
             method: 'PUT',
@@ -279,17 +276,7 @@ export async function renderPreferredRegionPage(container, isCurrentRoute = () =
   document.getElementById('btn-map-revoke')?.addEventListener('click', async () => {
     if (confirm('위치 정보 이용 동의를 철회하시겠습니까?\n철회 시 등록된 선호위치와 대기 중인 모든 매칭 요청이 파기됩니다.')) {
       try {
-        const csrfResp = await fetch(`${API_BASE_URL}/auth/csrf`, { credentials: 'include' })
-        if (!csrfResp.ok) throw new Error('CSRF 토큰 발급에 실패했습니다.')
-        
-        const readCookie = (name) => {
-          const prefix = `${encodeURIComponent(name)}=`
-          const cookie = document.cookie
-            .split('; ')
-            .find((item) => item.startsWith(prefix))
-          return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null
-        }
-        const csrfToken = readCookie('XSRF-TOKEN')
+        const csrfToken = await getCsrfToken()
 
         const resp = await fetch(`${API_BASE_URL}/users/me/preferred-region`, {
           method: 'DELETE',
@@ -607,14 +594,6 @@ export async function renderPreferredRegionPage(container, isCurrentRoute = () =
             map.setCenter(new window.kakao.maps.LatLng(initLat, initLng))
           }, 150)
 
-          function readCookie(name) {
-            const prefix = `${encodeURIComponent(name)}=`
-            const cookie = document.cookie
-              .split('; ')
-              .find((item) => item.startsWith(prefix))
-            return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null
-          }
-
           const confirmBtn = document.getElementById('btn-confirm-location')
           confirmBtn?.addEventListener('click', async () => {
             if (!currentRegionCode || !currentRegionName) {
@@ -623,9 +602,7 @@ export async function renderPreferredRegionPage(container, isCurrentRoute = () =
             }
 
             try {
-              const csrfResp = await fetch(`${API_BASE_URL}/auth/csrf`, { credentials: 'include' })
-              if (!csrfResp.ok) throw new Error('CSRF 토큰 발급에 실패했습니다.')
-              const csrfToken = readCookie('XSRF-TOKEN')
+              const csrfToken = await getCsrfToken()
 
               const resp = await fetch(`${API_BASE_URL}/users/me/preferred-region`, {
                 method: 'PUT',

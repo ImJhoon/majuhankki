@@ -90,9 +90,9 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         if (StringUtils.hasText(p.cors().allowedOrigin())) {
-            configuration.setAllowedOrigins(List.of(p.cors().allowedOrigin(), "null"));  // null은 채팅테스트용
-        }else{
-            configuration.setAllowedOrigins(List.of("null"));
+            configuration.setAllowedOrigins(List.of(p.cors().allowedOrigin()));
+        } else {
+            configuration.setAllowedOrigins(List.of());
         }
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-XSRF-TOKEN"));

@@ -41,7 +41,7 @@ public class ReviewCommandController {
             name = "X-XSRF-TOKEN",
             in = ParameterIn.HEADER,
             required = true,
-            description = "GET /auth/csrf로 발급받은 XSRF-TOKEN 쿠키 값"
+            description = "GET /auth/csrf 응답의 data.token"
     )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "후기 작성 성공"),

@@ -52,7 +52,7 @@ public class UserLocationPreferenceController {
             description = "위치 동의 여부와 함께 구 단위 기본 활동지역을 저장하거나 수정합니다."
     )
     @Parameter(name = "X-XSRF-TOKEN", in = ParameterIn.HEADER, required = true,
-            description = "GET /auth/csrf로 발급받은 XSRF-TOKEN 쿠키 값")
+            description = "GET /auth/csrf 응답의 data.token")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "설정 성공"),
             @ApiResponse(responseCode = "401", description = "인증 필요",
@@ -75,7 +75,7 @@ public class UserLocationPreferenceController {
             description = "선호 지역과 동의 내역을 삭제 처리합니다."
     )
     @Parameter(name = "X-XSRF-TOKEN", in = ParameterIn.HEADER, required = true,
-            description = "GET /auth/csrf로 발급받은 XSRF-TOKEN 쿠키 값")
+            description = "GET /auth/csrf 응답의 data.token")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "철회 성공"),
             @ApiResponse(responseCode = "401", description = "인증 필요",

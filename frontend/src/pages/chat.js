@@ -1,4 +1,5 @@
 import { getAccessToken } from '../auth/token-storage.js'
+import { getCsrfToken } from '../auth/csrf.js'
 import { navigateTo } from '../main.js'
 import { getLatestMatchResult } from '../matching/matching-api.js'
 import { API_BASE_URL } from '../config/api.js'
@@ -237,17 +238,7 @@ export function renderChatPage(container) {
     if (!confirm('정말로 매칭을 종료하시겠습니까?\n종료 시 상대방과의 채팅방도 함께 폐쇄됩니다.')) return
 
     try {
-      const csrfResp = await fetch(`${API_BASE_URL}/auth/csrf`, { credentials: 'include' })
-      if (!csrfResp.ok) throw new Error('CSRF 토큰 발급에 실패했습니다.')
-
-      const readCookie = (name) => {
-        const prefix = `${encodeURIComponent(name)}=`
-        const cookie = document.cookie
-          .split('; ')
-          .find((item) => item.startsWith(prefix))
-        return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null
-      }
-      const csrfToken = readCookie('XSRF-TOKEN')
+      const csrfToken = await getCsrfToken()
 
       const url = matchId
         ? `${API_BASE_URL}/matches/${matchId}/end`

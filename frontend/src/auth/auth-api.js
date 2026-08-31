@@ -1,5 +1,6 @@
 import { saveAccessToken } from './token-storage.js'
 import { clearAccessToken } from './token-storage.js'
+import { getCsrfToken } from './csrf.js'
 import { API_BASE_URL } from '../config/api.js'
 
 const nativeFetch = window.fetch.bind(window)
@@ -61,12 +62,7 @@ export function startGoogleLogin() {
  * 일반(로컬) 이메일 회원가입을 수행합니다.
  */
 export async function signUp(email, password, nickname) {
-  await issueCsrfToken()
-  const csrfToken = readCookie('XSRF-TOKEN')
-
-  if (!csrfToken) {
-    throw new Error('CSRF 토큰을 발급받지 못했습니다.')
-  }
+  const csrfToken = await getCsrfToken(nativeFetch)
 
   const response = await fetch(`${API_BASE_URL}/auth/signup`, {
     method: 'POST',
@@ -90,12 +86,7 @@ export async function signUp(email, password, nickname) {
  * 일반(로컬) 이메일 로그인을 수행합니다.
  */
 export async function login(email, password) {
-  await issueCsrfToken()
-  const csrfToken = readCookie('XSRF-TOKEN')
-
-  if (!csrfToken) {
-    throw new Error('CSRF 토큰을 발급받지 못했습니다.')
-  }
+  const csrfToken = await getCsrfToken(nativeFetch)
 
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
     method: 'POST',
@@ -121,12 +112,7 @@ export async function login(email, password) {
  * 로그아웃을 수행하고 브라우저 세션을 지웁니다.
  */
 export async function logout() {
-  await issueCsrfToken()
-  const csrfToken = readCookie('XSRF-TOKEN')
-
-  if (!csrfToken) {
-    throw new Error('CSRF 토큰을 발급받지 못했습니다.')
-  }
+  const csrfToken = await getCsrfToken(nativeFetch)
 
   const response = await fetch(`${API_BASE_URL}/auth/logout`, {
     method: 'POST',
@@ -146,12 +132,7 @@ export async function logout() {
  * 일회용 인가코드를 백엔드 Access/Refresh 토큰 쿠키로 교환합니다.
  */
 export async function exchangeOAuthCode(code) {
-  await issueCsrfToken()
-  const csrfToken = readCookie('XSRF-TOKEN')
-
-  if (!csrfToken) {
-    throw new Error('CSRF 토큰을 발급받지 못했습니다.')
-  }
+  const csrfToken = await getCsrfToken(nativeFetch)
 
   const response = await fetch(`${API_BASE_URL}/auth/oauth2/exchange`, {
     method: 'POST',
@@ -172,22 +153,10 @@ export async function exchangeOAuthCode(code) {
   return body.data
 }
 
-async function issueCsrfToken() {
-  const response = await nativeFetch(`${API_BASE_URL}/auth/csrf`, {
-    credentials: 'include',
-  })
-
-  if (!response.ok) {
-    throw new Error('CSRF 토큰 요청에 실패했습니다.')
-  }
-}
-
 async function refreshAccessToken() {
   if (!refreshPromise) {
     refreshPromise = (async () => {
-      await issueCsrfToken()
-      const csrfToken = readCookie('XSRF-TOKEN')
-      if (!csrfToken) throw new Error('CSRF 토큰을 발급받지 못했습니다.')
+      const csrfToken = await getCsrfToken(nativeFetch)
 
       const response = await nativeFetch(`${API_BASE_URL}/auth/token/refresh`, {
         method: 'POST',
@@ -213,15 +182,6 @@ function redirectToLanding() {
 function isAuthEndpoint(input) {
   const url = typeof input === 'string' ? input : input?.url || ''
   return url.includes('/auth/') || url.includes('/oauth2/') || url.includes('/login/oauth2/')
-}
-
-function readCookie(name) {
-  const prefix = `${encodeURIComponent(name)}=`
-  const cookie = document.cookie
-    .split('; ')
-    .find((item) => item.startsWith(prefix))
-
-  return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null
 }
 
 async function readJson(response) {

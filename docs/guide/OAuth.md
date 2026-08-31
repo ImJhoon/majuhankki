@@ -74,7 +74,7 @@ sequenceDiagram
   * 로그인 엔드포인트는 외부 제공자(카카오)와의 브라우저 이동이므로 CSRF 검사를 비활성화합니다.
 * **`apiSecurityFilterChain` (`Order(2)`, 나머지 모든 API)**:
   * 완전한 무상태(`SessionCreationPolicy.STATELESS`)를 유지합니다.
-  * Cookie-to-Header 기반 CSRF 방어(`CookieCsrfTokenRepository` + `SpaCsrfTokenRequestHandler`) 및 JWT 인증 필터(`JwtFilter`)를 적용합니다.
+  * Cookie-to-Header 기반 CSRF 방어(`CookieCsrfTokenRepository` + `SpaCsrfTokenRequestHandler`) 및 JWT 인증 필터(`JwtFilter`)를 적용합니다. 프론트엔드는 `GET /auth/csrf` 응답의 `data.token`을 `X-XSRF-TOKEN` 헤더로 전송하며, 다른 Origin의 CSRF 쿠키를 직접 읽지 않습니다.
 
 ---
 

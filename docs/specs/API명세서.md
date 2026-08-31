@@ -74,7 +74,7 @@
 
 | Method | Endpoint | 설명 | 인증 |
 | --- | --- | --- | --- |
-| GET | `/auth/csrf` | CSRF 토큰 쿠키 발급 | N |
+| GET | `/auth/csrf` | CSRF 토큰 발급 및 XSRF-TOKEN 쿠키 설정 | N |
 | POST | `/auth/signup` | 이메일 회원가입 | N |
 | POST | `/auth/login` | 이메일·비밀번호 로그인 및 토큰 발급 | N |
 | GET | `/oauth2/authorization/kakao` | 카카오 OAuth2 로그인 시작 | N |
@@ -97,6 +97,20 @@
 | POST | `/users/me/personality-profile/skip` | 선택형 성향 온보딩 건너뛰기 | Y |
 | GET | `/users/me/food-preferences` | 내 음식 카테고리 선호 조회 | Y |
 | PUT | `/users/me/food-preferences` | 내 음식 카테고리 선호 전체 갱신 | Y |
+
+**GET /auth/csrf 응답**
+
+```json
+{
+  "success": true,
+  "data": {
+    "token": "csrf-token-value"
+  },
+  "error": null
+}
+```
+
+응답의 `data.token`은 상태 변경 요청의 `X-XSRF-TOKEN` 헤더에 사용한다. `XSRF-TOKEN` 쿠키는 서버가 토큰 대조에 사용하며, 다른 Origin의 프론트엔드는 쿠키를 직접 읽지 않는다.
 
 **POST /auth/signup**
 
@@ -160,7 +174,7 @@ Refresh Token 원문은 응답 본문에 포함하지 않고 `HttpOnly`, `Path=/
 }
 ```
 
-브라우저 클라이언트는 상태 변경 요청 전에 `GET /auth/csrf`를 호출하여 `Path=/`인 `XSRF-TOKEN` 쿠키를 발급받는다. 이 응답은 과거 `Path=/auth`로 발급된 동명 CSRF 쿠키를 함께 만료시킨다. 이후 `POST`, `PUT`, `PATCH`, `DELETE` 요청에는 쿠키 값과 동일한 값을 `X-XSRF-TOKEN` 헤더로 전달한다. Refresh Token 쿠키가 자동 전송되는 `/auth/token/refresh`와 `/auth/logout`에도 이 규칙을 적용한다.
+브라우저 클라이언트는 각 상태 변경 요청 직전에 `GET /auth/csrf`를 호출한다. 서버는 응답 본문 `data.token`과 `Path=/`인 `XSRF-TOKEN` 쿠키를 함께 제공하며, 프론트엔드는 같은 발급 응답의 토큰을 `POST`, `PUT`, `PATCH`, `DELETE` 요청의 `X-XSRF-TOKEN` 헤더로 전달한다. 완료된 토큰은 장기 캐시하지 않으며, 동시에 진행 중인 발급 요청만 공유할 수 있다. 다른 Origin에서는 프론트엔드가 백엔드 쿠키를 직접 읽지 않는다. 이 응답은 과거 `Path=/auth`로 발급된 동명 CSRF 쿠키를 함께 만료시킨다. Refresh Token 쿠키가 자동 전송되는 `/auth/token/refresh`와 `/auth/logout`에도 이 규칙을 적용한다.
 
 CORS는 기본적으로 어떤 외부 Origin도 허용하지 않는다. 프론트엔드가 별도 Origin에서 실행될 때 서버의 `FRONTEND_ORIGIN`에 정확한 Origin 하나를 지정하고, 클라이언트 요청에는 credentials 옵션을 사용한다.
 
@@ -205,7 +219,7 @@ OAuth 성공 또는 실패 후에는 `state` 검증에 사용한 임시 세션�
 - `Authorization: Bearer {accessToken}`과 `X-XSRF-TOKEN` 헤더가 필요하다.
 - 요청에 동명 `refreshToken` 쿠키가 여러 경로로 중복 전송되면 각 토큰에 해당하는 DB 행의 `revoked_at`을 모두 기록하고 쿠키를 삭제한다.
 - 현재 `Path=/` 쿠키와 과거 버전의 `Path=/auth` 쿠키를 모두 만료시켜 동명 쿠키가 중복 전송되지 않도록 한다.
-- `XSRF-TOKEN`은 인증 자격증명이 아니므로 로그아웃 시 삭제하지 않으며, 이후 상태 변경 요청에서도 쿠키 값과 같은 `X-XSRF-TOKEN` 헤더를 계속 전송한다.
+- `XSRF-TOKEN`은 인증 자격증명이 아니므로 로그아웃 시 삭제하지 않으며, 이후 상태 변경 요청 직전에 다시 호출한 `GET /auth/csrf` 응답의 `data.token`을 `X-XSRF-TOKEN` 헤더로 전송한다.
 - Refresh Token 쿠키가 없거나 이미 폐기된 경우에도 쿠키 삭제 응답을 위해 성공으로 처리한다.
 - 카카오·Google 계정 자체를 로그아웃하거나 연결을 해제하지는 않는다.
 
@@ -359,7 +373,7 @@ V1 응답값은 `1`, `3`, `5`만 허용하며 각각 `0`, `50`, `100`점으로 �
 
 `GET`과 `PUT /users/me/food-preferences`는 모두 `foodCategories` 배열을 반환하며 최대 5개까지 허용한다. 변경 요청은 기존 목록에 추가하는 방식이 아니라 요청 목록으로 전체 교체한다.
 
-`PUT`, `POST`, `DELETE` 요청에는 인증 Access Token 쿠키와 `GET /auth/csrf`로 발급받은 `X-XSRF-TOKEN` 헤더가 필요하다. 지원하지 않는 버전·차원·응답값·태그·음식 코드는 `422 PERSONALITY_002`를 반환한다.
+`PUT`, `POST`, `DELETE` 요청에는 인증 Access Token 쿠키와 `GET /auth/csrf` 응답의 `data.token`을 담은 `X-XSRF-TOKEN` 헤더가 필요하다. 지원하지 않는 버전·차원·응답값·태그·음식 코드는 `422 PERSONALITY_002`를 반환한다.
 
 ---
 
@@ -611,7 +625,7 @@ Query: `cursor` (마지막으로 받은 messageId), `size` (기본 30)
 | 410 | `REVIEW_PERIOD_EXPIRED` | 매칭 완료 시점부터 7일이 지나 작성 기간 만료 |
 | 500 | `REVIEW_DATA_INVALID` | 매칭 참여자 정합성 오류로 후기 처리를 진행할 수 없음 |
 
-이 API는 쿠키 기반 인증을 사용하는 POST이므로 `GET /auth/csrf`로 발급받은 `XSRF-TOKEN` 쿠키 값을 `X-XSRF-TOKEN` 요청 헤더로 전달해야 한다. 네트워크 재시도 시 서비스 사전 조회와 DB Unique 제약을 함께 적용하고 중복이면 `409 REVIEW_ALREADY_SUBMITTED`를 반환한다. 별도 `Idempotency-Key`는 사용하지 않는다.
+이 API는 쿠키 기반 인증을 사용하는 POST이므로 `GET /auth/csrf` 응답의 `data.token`을 `X-XSRF-TOKEN` 요청 헤더로 전달해야 한다. `XSRF-TOKEN` 쿠키는 브라우저가 자동 전송한다. 네트워크 재시도 시 서비스 사전 조회와 DB Unique 제약을 함께 적용하고 중복이면 `409 REVIEW_ALREADY_SUBMITTED`를 반환한다. 별도 `Idempotency-Key`는 사용하지 않는다.
 
 ### 후기 Enum 코드와 표시 문구
 

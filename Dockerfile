@@ -13,6 +13,8 @@ FROM eclipse-temurin:17-jre
 
 WORKDIR /app
 
+ENV SPRING_PROFILES_ACTIVE=prod
+
 RUN useradd --system --create-home appuser
 COPY --from=builder --chown=appuser:appuser /workspace/build/libs/*.jar app.jar
 

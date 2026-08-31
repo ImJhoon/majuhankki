@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../config/api.js'
+import { getCsrfToken } from '../auth/csrf.js'
 
 /**
  * 매칭 API 오류를 화면에서 상태 코드와 함께 처리하기 위한 오류 타입입니다.
@@ -11,7 +12,6 @@ export class MatchingApiError extends Error {
     this.code = code
   }
 }
-
 export async function getPreferredRegion() {
   const response = await fetch(`${API_BASE_URL}/users/me/preferred-region`, {
     credentials: 'include',
@@ -88,21 +88,11 @@ export async function getLatestMatchResult() {
 }
 
 async function ensureCsrfToken() {
-  let token = readCookie('XSRF-TOKEN')
-  if (token) return token
-
-  const response = await fetch(`${API_BASE_URL}/auth/csrf`, {
-    credentials: 'include',
-  })
-  if (!response.ok) {
-    throw new MatchingApiError('CSRF 토큰을 발급받지 못했습니다.', { status: response.status })
+  try {
+    return await getCsrfToken()
+  } catch (error) {
+    throw new MatchingApiError(error.message || 'CSRF 토큰을 발급받지 못했습니다.')
   }
-
-  token = readCookie('XSRF-TOKEN')
-  if (!token) {
-    throw new MatchingApiError('CSRF 토큰을 발급받지 못했습니다.')
-  }
-  return token
 }
 
 async function readResponse(response, fallbackMessage) {
@@ -129,13 +119,4 @@ async function readJson(response) {
   } catch {
     return null
   }
-}
-
-function readCookie(name) {
-  const prefix = `${encodeURIComponent(name)}=`
-  const cookie = document.cookie
-    .split('; ')
-    .find((item) => item.startsWith(prefix))
-
-  return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null
 }
