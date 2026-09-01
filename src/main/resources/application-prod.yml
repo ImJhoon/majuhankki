@@ -4,7 +4,31 @@ app:
       secure: true
       same-site: None
 
+spring:
+  data:
+    redis:
+      # RedisTemplate만 사용하므로 JPA Repository를 Redis 후보로 다시 스캔하지 않는다.
+      repositories:
+        enabled: false
+
+server:
+  tomcat:
+    threads:
+      max: 20
+      min-spare: 2
+    accept-count: 50
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
 management:
+  prometheus:
+    metrics:
+      export:
+        enabled: false
   endpoint:
     health:
       # Render의 5초 제한 Health Check가 DB/Redis 지연 때문에 실패하지 않도록
