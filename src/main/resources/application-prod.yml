@@ -4,7 +4,41 @@ app:
       secure: true
       same-site: None
 
+spring:
+  data:
+    jpa:
+      repositories:
+        # Render가 포트 감지 제한 안에 HTTP 서버를 먼저 시작하도록 JPA 초기화를 지연한다.
+        bootstrap-mode: lazy
+    redis:
+      # RedisTemplate만 사용하므로 JPA Repository를 Redis 후보로 다시 스캔하지 않는다.
+      repositories:
+        enabled: false
+
+server:
+  tomcat:
+    threads:
+      max: 20
+      min-spare: 2
+    accept-count: 50
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
 management:
+  prometheus:
+    metrics:
+      export:
+        enabled: false
+  endpoint:
+    health:
+      # Render의 5초 제한 Health Check가 DB/Redis 지연 때문에 실패하지 않도록
+      # 외부 의존성과 분리된 liveness 그룹을 활성화한다.
+      probes:
+        enabled: true
   endpoints:
     web:
       # 운영에서는 메트릭 엔드포인트를 외부에 노출하지 않는다.
