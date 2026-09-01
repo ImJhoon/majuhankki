@@ -35,17 +35,17 @@
 
 ## 4. 외부 서비스 운영 주소 등록
 
-- [ ] Kakao·Google OAuth 콘솔에 Render 콜백 URI와 Cloudflare Pages 성공 리다이렉트 URI를 정확히 등록한다.
-- [ ] Render에는 `SPRING_PROFILES_ACTIVE=prod`와 백엔드 필수 환경변수를, Cloudflare Pages에는 `VITE_API_BASE_URL`과 프론트엔드 공개 키를 등록한다. Docker 이미지도 안전한 기본값으로 `prod`를 사용하지만 Render 환경변수에 같은 값을 명시한다.
+- [x] Kakao·Google OAuth 콘솔에 Render 콜백 URI와 Cloudflare Pages 성공 리다이렉트 URI를 정확히 등록한다.
+- [x] Render에는 `SPRING_PROFILES_ACTIVE=prod`와 백엔드 필수 환경변수를, Cloudflare Pages에는 `VITE_API_BASE_URL`과 프론트엔드 공개 키를 등록한다. Docker 이미지도 안전한 기본값으로 `prod`를 사용하지만 Render 환경변수에 같은 값을 명시한다.
 
 ## 5. 배포 후 필수 검증
 
-- [ ] 회원가입·LOCAL 로그인·OAuth 로그인·토큰 재발급·로그아웃을 실제 배포 주소에서 검증한다.
-- [ ] 두 사용자로 매칭 요청부터 제안 수락, WebSocket 결과 수신, 채팅 송수신, 매칭·채팅방 동시 종료까지 검증한다.
-- [ ] 마이페이지 조회·수정, 프로필 이미지, 매칭 이력, 후기 작성·조회 흐름을 실제 배포 DB 기준으로 검증한다.
-- [ ] 사용자 신고와 관리자 신고 처리·기각 요청이 Cloudflare Pages Origin에서 Render로 전송되고, CORS preflight와 CSRF 검증을 통과하는지 확인한다.
-- [ ] 프런트엔드 정적 검사에서 API 주소 하드코딩, 상대 경로 `/auth/csrf`, `document.cookie` 기반 CSRF 토큰 조회가 남아 있지 않은지 확인하고 `npm run build`를 통과시킨다.
-- [ ] Render 무료 인스턴스가 유휴 시 정지하면 스케줄러와 WebSocket도 중단된다는 제한을 팀에 공유하고, 시연 전 서버 기동과 핵심 흐름 재검증 절차를 확정한다.
+- [x] 회원가입·LOCAL 로그인·OAuth 로그인·토큰 재발급·로그아웃을 실제 배포 주소에서 검증한다.
+- [x] 두 사용자로 매칭 요청부터 제안 수락, WebSocket 결과 수신, 채팅 송수신, 매칭·채팅방 동시 종료까지 검증한다.
+- [x] 마이페이지 조회·수정, 프로필 이미지, 매칭 이력, 후기 작성·조회 흐름을 실제 배포 DB 기준으로 검증한다.
+- [x] 사용자 신고와 관리자 신고 처리·기각 요청이 Cloudflare Pages Origin에서 Render로 전송되고, CORS preflight와 CSRF 검증을 통과하는지 확인한다.
+- [x] 프런트엔드 정적 검사에서 API 주소 하드코딩, 상대 경로 `/auth/csrf`, `document.cookie` 기반 CSRF 토큰 조회가 남아 있지 않은지 확인하고 `npm run build`를 통과시킨다.
+- [x] Render 무료 인스턴스가 유휴 시 정지하면 스케줄러와 WebSocket도 중단된다는 제한을 팀에 공유하고, 시연 전 서버 기동과 핵심 흐름 재검증 절차를 확정한다.
 
 ## 완료 기준
 
