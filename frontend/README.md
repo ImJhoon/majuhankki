@@ -22,6 +22,8 @@ OAUTH2_SUCCESS_REDIRECT_URI=http://localhost:3000/oauth/callback
 
 상태 변경 요청 직전에 `GET /auth/csrf`를 호출하고 응답의 `data.token`을 `X-XSRF-TOKEN` 헤더로 전달합니다. 프론트엔드는 다른 Origin의 백엔드 CSRF 쿠키를 직접 읽거나 완료된 토큰을 장기 캐시하지 않습니다.
 
+상태 변경 요청 직전에 `GET /auth/csrf`를 호출하고 응답의 `data.token`을 `X-XSRF-TOKEN` 헤더로 전달합니다. 프론트엔드는 다른 Origin의 백엔드 CSRF 쿠키를 직접 읽거나 완료된 토큰을 장기 캐시하지 않습니다.
+
 ## OAuth 동작
 
 - 카카오 로그인 버튼은 브라우저를 백엔드 OAuth 시작 경로로 이동시킵니다.
