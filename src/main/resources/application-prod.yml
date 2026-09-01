@@ -6,6 +6,10 @@ app:
 
 spring:
   data:
+    jpa:
+      repositories:
+        # Render가 포트 감지 제한 안에 HTTP 서버를 먼저 시작하도록 JPA 초기화를 지연한다.
+        bootstrap-mode: lazy
     redis:
       # RedisTemplate만 사용하므로 JPA Repository를 Redis 후보로 다시 스캔하지 않는다.
       repositories:

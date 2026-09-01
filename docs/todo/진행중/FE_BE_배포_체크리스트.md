@@ -5,7 +5,7 @@
 ## 1. 배포 실행 준비
 
 - [x] Render에서 Java 17 Spring Boot 애플리케이션을 빌드·실행할 `Dockerfile`과 `.dockerignore`를 추가하고, Docker 런타임의 기본 프로필을 `prod`로 지정하며 Render의 `PORT` 및 외부 의존성과 분리된 `/actuator/health/liveness`를 사용하도록 구성한다. 로컬 직접 실행은 `dev` 프로필을 유지한다.
-- [x] Render 무료 인스턴스의 제한된 메모리에 맞춰 운영 Tomcat 스레드 수와 `@Async` 실행기를 제한하고, 운영에서 Swagger·Prometheus 및 사용하지 않는 Redis Repository 스캔을 비활성화한다.
+- [x] Render 무료 인스턴스의 제한된 메모리에 맞춰 운영 Tomcat 스레드 수와 `@Async` 실행기를 제한하고, 운영에서 Swagger·Prometheus 및 사용하지 않는 Redis Repository 스캔을 비활성화하며 JPA Repository 초기화를 지연한다.
 - [x] Cloudflare Pages가 `frontend`를 루트로 `npm run build`를 실행하고 `dist`를 배포하도록 설정한다.
 - [x] 프론트엔드의 모든 REST·SockJS 연결 주소를 `VITE_API_BASE_URL` 기준으로 통일한다. 로컬에서는 빈 값과 Vite 프록시를 사용하고, 배포에서는 Render HTTPS 주소를 지정한다.
 - [x] `frontend/src/pages/admin.js`의 `http://localhost:8080` 하드코딩을 제거하고 공용 `frontend/src/config/api.js`의 `API_BASE_URL`을 사용한다.
