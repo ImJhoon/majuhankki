@@ -220,6 +220,12 @@ class SecurityIntegrationTest {
     }
 
     @Test
+    void actuatorHealthSubPathsArePublicForDeploymentHealthChecks() throws Exception {
+        mockMvc.perform(get("/actuator/health/liveness"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void latestMatchResultWithoutTokenIsUnauthorized() throws Exception {
         mockMvc.perform(get("/matches/realtime/results/latest"))
                 .andExpect(status().isUnauthorized())

@@ -5,6 +5,12 @@ app:
       same-site: None
 
 management:
+  endpoint:
+    health:
+      # Render의 5초 제한 Health Check가 DB/Redis 지연 때문에 실패하지 않도록
+      # 외부 의존성과 분리된 liveness 그룹을 활성화한다.
+      probes:
+        enabled: true
   endpoints:
     web:
       # 운영에서는 메트릭 엔드포인트를 외부에 노출하지 않는다.
