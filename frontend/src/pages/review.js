@@ -1,4 +1,5 @@
 import { navigateTo, API_BASE_URL } from '../main.js'
+import { getCsrfToken } from '../auth/csrf.js'
 
 export async function renderReviewPage(container) {
   const params = new URLSearchParams(window.location.search)
@@ -161,14 +162,7 @@ export async function renderReviewPage(container) {
     btnSubmit.innerHTML = '<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span> <span>제출 중...</span>'
 
     try {
-      const csrfResp = await fetch(`${API_BASE_URL}/auth/csrf`, { credentials: 'include' })
-      if (!csrfResp.ok) throw new Error('CSRF 토큰 발급에 실패했습니다.')
-      const readCookie = (name) => {
-        const prefix = `${encodeURIComponent(name)}=`
-        const cookie = document.cookie.split('; ').find(item => item.startsWith(prefix))
-        return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null
-      }
-      const csrfToken = readCookie('XSRF-TOKEN')
+      const csrfToken = await getCsrfToken()
 
       const resp = await fetch(`${API_BASE_URL}/reviews`, {
         method: 'POST',
