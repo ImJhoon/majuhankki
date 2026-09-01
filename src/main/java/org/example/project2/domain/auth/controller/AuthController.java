@@ -58,7 +58,7 @@ public class AuthController {
             @Parameter(
                     name = "X-XSRF-TOKEN",
                     in = ParameterIn.HEADER,
-                    description = "CSRF 토큰 (GET /auth/csrf 호출 후 브라우저 쿠키에서 복사한 값을 입력)",
+                    description = "CSRF 토큰 (GET /auth/csrf 응답의 data.token을 입력)",
                     required = true,
                     schema = @Schema(type = "string")
             )
@@ -84,7 +84,7 @@ public class AuthController {
             @Parameter(
                     name = "X-XSRF-TOKEN",
                     in = ParameterIn.HEADER,
-                    description = "CSRF 토큰 (GET /auth/csrf 호출 후 브라우저 쿠키에서 복사한 값을 입력)",
+                    description = "CSRF 토큰 (GET /auth/csrf 응답의 data.token을 입력)",
                     required = true,
                     schema = @Schema(type = "string")
             )
@@ -128,7 +128,7 @@ public class AuthController {
             @Parameter(
                     name = "X-XSRF-TOKEN",
                     in = ParameterIn.HEADER,
-                    description = "CSRF 토큰 (GET /auth/csrf 응답의 XSRF-TOKEN 쿠키 값)",
+                    description = "CSRF 토큰 (GET /auth/csrf 응답의 data.token)",
                     required = true,
                     schema = @Schema(type = "string")
             )
@@ -140,7 +140,7 @@ public class AuthController {
                     headers = @Header(
                             name = "Set-Cookie",
                             description = "Secure/HttpOnly Access/Refresh Token 쿠키",
-                            schema = @Schema(type = "string", example = "refreshToken=...; Path=/; Secure; HttpOnly; SameSite=Strict")
+                            schema = @Schema(type = "string", example = "refreshToken=...; Path=/; Secure; HttpOnly; SameSite=None")
                     ),
                     content = @Content(schema = @Schema(implementation = OAuthTokenExchangeSuccessResponse.class))
             ),
@@ -187,7 +187,7 @@ public class AuthController {
             @Parameter(
                     name = "X-XSRF-TOKEN",
                     in = ParameterIn.HEADER,
-                    description = "GET /auth/csrf로 발급받은 XSRF-TOKEN 쿠키 값",
+                    description = "GET /auth/csrf 응답의 data.token",
                     required = true,
                     schema = @Schema(type = "string")
             )
@@ -230,7 +230,7 @@ public class AuthController {
     @Parameter(
             name = "X-XSRF-TOKEN",
             in = ParameterIn.HEADER,
-            description = "CSRF 토큰 (GET /auth/csrf로 발급받은 쿠키 값)",
+            description = "CSRF 토큰 (GET /auth/csrf 응답의 data.token)",
             required = true,
             schema = @Schema(type = "string")
     )

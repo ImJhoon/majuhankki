@@ -56,7 +56,7 @@ public class MatchProposalController {
 
     @Operation(summary = "매칭 후보 제안 수락 또는 거절")
     @Parameter(name = "X-XSRF-TOKEN", in = ParameterIn.HEADER, required = true,
-            description = "GET /auth/csrf로 발급받은 XSRF-TOKEN 쿠키 값")
+            description = "GET /auth/csrf 응답의 data.token")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "결정 저장 성공"),
             @ApiResponse(responseCode = "401", description = "인증 필요",

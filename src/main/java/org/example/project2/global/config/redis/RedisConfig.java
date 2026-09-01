@@ -4,9 +4,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.RedisPassword;
+import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.RedisSerializer;
+import org.springframework.util.StringUtils;
 
 @Configuration
 @RequiredArgsConstructor
@@ -20,7 +24,33 @@ public class RedisConfig {
      */
     @Bean
     public RedisConnectionFactory redisConnectionFactory() {
-        return new LettuceConnectionFactory(redisProperties.host(), redisProperties.port());
+        RedisStandaloneConfiguration server =
+                new RedisStandaloneConfiguration(
+                        redisProperties.host(),
+                        redisProperties.port()
+                );
+
+        if (StringUtils.hasText(redisProperties.username())) {
+            server.setUsername(redisProperties.username());
+        }
+
+        if (StringUtils.hasText(redisProperties.password())) {
+            server.setPassword(RedisPassword.of(redisProperties.password()));
+        }
+
+        LettuceClientConfiguration clientConfiguration;
+
+        if (redisProperties.ssl().enabled()) {
+            clientConfiguration = LettuceClientConfiguration.builder()
+                    .useSsl()
+                    .and()
+                    .build();
+        } else {
+            clientConfiguration = LettuceClientConfiguration.builder()
+                    .build();
+        }
+
+        return new LettuceConnectionFactory(server, clientConfiguration);
     }
 
     /*
@@ -34,6 +64,7 @@ public class RedisConfig {
      Java 객체로 복원(역직렬화)하는 규칙이 있어야 함. setKey..., setValue... 설정으로
      직렬화, 역직렬화 기능 RedisTemplate에 추가
      */
+
     @Bean
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
         RedisTemplate<String, Object> redisTemplate = new RedisTemplate<>();

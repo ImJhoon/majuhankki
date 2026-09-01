@@ -5,16 +5,13 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.csrf.CsrfTokenRequestHandler;
-import org.springframework.security.web.csrf.XorCsrfTokenRequestAttributeHandler;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
 import java.util.function.Supplier;
 
 @Component
 public class SpaCsrfTokenRequestHandler implements CsrfTokenRequestHandler {
     private final CsrfTokenRequestHandler plain = new CsrfTokenRequestAttributeHandler();
-    private final CsrfTokenRequestHandler xor = new XorCsrfTokenRequestAttributeHandler();
 
     @Override
     public void handle(
@@ -22,14 +19,12 @@ public class SpaCsrfTokenRequestHandler implements CsrfTokenRequestHandler {
             HttpServletResponse response,
             Supplier<CsrfToken> deferredCsrfToken
     ) {
-        xor.handle(request, response, deferredCsrfToken);
+        // /auth/csrf 응답의 토큰을 상태 변경 요청 헤더에 그대로 재사용한다.
+        plain.handle(request, response, deferredCsrfToken);
     }
 
     @Override
     public String resolveCsrfTokenValue(HttpServletRequest request, CsrfToken csrfToken) {
-        if (StringUtils.hasText(request.getHeader(csrfToken.getHeaderName()))) {
-            return plain.resolveCsrfTokenValue(request, csrfToken);
-        }
-        return xor.resolveCsrfTokenValue(request, csrfToken);
+        return plain.resolveCsrfTokenValue(request, csrfToken);
     }
 }

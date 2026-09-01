@@ -1,4 +1,5 @@
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+import { API_BASE_URL } from '../config/api.js'
+import { getCsrfToken } from '../auth/csrf.js'
 
 /**
  * 내 성향 프로필을 조회합니다.
@@ -243,34 +244,7 @@ export async function updateFoodPreferences(foodCategories) {
 }
 
 async function ensureCsrfToken() {
-  let token = readCookie('XSRF-TOKEN')
-  if (!token) {
-    await issueCsrfToken()
-    token = readCookie('XSRF-TOKEN')
-  }
-  if (!token) {
-    throw new Error('CSRF 토큰을 발급받지 못했습니다.')
-  }
-  return token
-}
-
-async function issueCsrfToken() {
-  const response = await fetch(`${API_BASE_URL}/auth/csrf`, {
-    credentials: 'include',
-  })
-
-  if (!response.ok) {
-    throw new Error('CSRF 토큰 요청에 실패했습니다.')
-  }
-}
-
-function readCookie(name) {
-  const prefix = `${encodeURIComponent(name)}=`
-  const cookie = document.cookie
-    .split('; ')
-    .find((item) => item.startsWith(prefix))
-
-  return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null
+  return getCsrfToken()
 }
 
 async function readJson(response) {

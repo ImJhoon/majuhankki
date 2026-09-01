@@ -1,3 +1,9 @@
+app:
+  security:
+    cookie:
+      secure: true
+      same-site: None
+
 management:
   endpoints:
     web:

@@ -42,7 +42,7 @@ public class RealtimeMatchRequestController {
 
     @Operation(summary = "실시간 매칭 요청 생성")
     @Parameter(name = "X-XSRF-TOKEN", in = ParameterIn.HEADER, required = true,
-            description = "GET /auth/csrf로 발급받은 XSRF-TOKEN 쿠키 값")
+            description = "GET /auth/csrf 응답의 data.token")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "요청 생성 및 대기 등록 성공"),
             @ApiResponse(responseCode = "401", description = "인증 필요",
@@ -74,7 +74,7 @@ public class RealtimeMatchRequestController {
 
     @Operation(summary = "내 실시간 매칭 요청 취소")
     @Parameter(name = "X-XSRF-TOKEN", in = ParameterIn.HEADER, required = true,
-            description = "GET /auth/csrf로 발급받은 XSRF-TOKEN 쿠키 값")
+            description = "GET /auth/csrf 응답의 data.token")
     @DeleteMapping("/{requestId}")
     public ResponseEntity<CommonResponse<Void>> cancel(
             @AuthenticationPrincipal UUID userId,

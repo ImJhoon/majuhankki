@@ -56,7 +56,7 @@ public class FoodPreferenceController {
             description = "요청에 포함된 최대 5개의 음식 카테고리로 기존 목록을 전체 교체합니다."
     )
     @Parameter(name = "X-XSRF-TOKEN", in = ParameterIn.HEADER, required = true,
-            description = "GET /auth/csrf로 발급받은 XSRF-TOKEN 쿠키 값")
+            description = "GET /auth/csrf 응답의 data.token")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "갱신 성공"),
             @ApiResponse(responseCode = "401", description = "인증 필요",

@@ -12,6 +12,7 @@ import {
   getPreferredRegion,
 } from '../matching/matching-api.js'
 import { getPersonalityProfile } from '../personality/personality-api.js'
+import { API_BASE_URL } from '../config/api.js'
 
 const TAG_GROUPS = [
   {
@@ -318,8 +319,7 @@ export async function renderMatchingRequestPage(container) {
       return
     }
 
-    const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
-    const socket = new window.SockJS(`${apiBaseUrl}/ws-chat`)
+    const socket = new window.SockJS(`${API_BASE_URL}/ws-chat`)
     stompClient = window.Stomp.over(socket)
     stompClient.debug = () => {}
     stompClient.connect({}, () => {

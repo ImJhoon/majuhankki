@@ -46,6 +46,10 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           ws: true,
         },
+        '/reviews': {
+          target: 'http://localhost:8080',
+          changeOrigin: true,
+        },
       },
     },
   }
