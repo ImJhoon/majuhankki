@@ -1,6 +1,6 @@
 import { navigateTo } from '../main.js'
-
-const API_BASE_URL = 'http://localhost:8080'
+import { API_BASE_URL } from '../config/api.js'
+import { getCsrfToken } from '../auth/csrf.js'
 
 export async function renderAdminPage(container) {
   container.innerHTML = `
@@ -125,14 +125,7 @@ export async function renderAdminPage(container) {
     if (!confirm(`정말로 해당 회원을 ${actionLabel} 처리하시겠습니까?`)) return
 
     try {
-      const csrfResp = await fetch('/auth/csrf', { credentials: 'include' })
-      if (!csrfResp.ok) throw new Error('CSRF 토큰 발급에 실패했습니다.')
-      const readCookie = (name) => {
-        const prefix = `${encodeURIComponent(name)}=`
-        const cookie = document.cookie.split('; ').find(item => item.startsWith(prefix))
-        return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null
-      }
-      const csrfToken = readCookie('XSRF-TOKEN')
+      const csrfToken = await getCsrfToken()
 
       const resp = await fetch(`${API_BASE_URL}/admin/reports/${reportId}/handle/${actionType}`, {
         method: 'POST',
@@ -158,17 +151,11 @@ export async function renderAdminPage(container) {
     if (!confirm('이 신고를 기각하고 목록에서 제거하시겠습니까?')) return
 
     try {
-      const csrfResp = await fetch('/auth/csrf', { credentials: 'include' })
-      if (!csrfResp.ok) throw new Error('CSRF 토큰 발급에 실패했습니다.')
-      const readCookie = (name) => {
-        const prefix = `${encodeURIComponent(name)}=`
-        const cookie = document.cookie.split('; ').find(item => item.startsWith(prefix))
-        return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null
-      }
+      const csrfToken = await getCsrfToken()
       const resp = await fetch(`${API_BASE_URL}/admin/reports/${reportId}/dismiss`, {
         method: 'POST',
         credentials: 'include',
-        headers: { 'X-XSRF-TOKEN': readCookie('XSRF-TOKEN') }
+        headers: { 'X-XSRF-TOKEN': csrfToken }
       })
       if (!resp.ok) throw new Error('신고 기각 처리에 실패했습니다.')
       await loadReports()

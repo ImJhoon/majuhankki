@@ -1,4 +1,5 @@
 import { navigateTo, API_BASE_URL } from '../main.js'
+import { getCsrfToken } from '../auth/csrf.js'
 
 export async function renderMyPage(container) {
   // 비인증 접근 시 웰컴(홈) 페이지로 리다이렉트
@@ -274,14 +275,7 @@ export async function renderMyPage(container) {
       }
 
       try {
-        const csrfResp = await fetch('/auth/csrf', { credentials: 'include' })
-        if (!csrfResp.ok) throw new Error('CSRF 토큰 발급에 실패했습니다.')
-        const readCookie = (name) => {
-          const prefix = `${encodeURIComponent(name)}=`
-          const cookie = document.cookie.split('; ').find(item => item.startsWith(prefix))
-          return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null
-        }
-        const csrfToken = readCookie('XSRF-TOKEN')
+        const csrfToken = await getCsrfToken()
 
         const resp = await fetch(`${API_BASE_URL}/reports`, {
           method: 'POST',
@@ -353,14 +347,7 @@ export async function renderMyPage(container) {
     }
 
     try {
-      const csrfResp = await fetch(`${API_BASE_URL}/auth/csrf`, { credentials: 'include' })
-      if (!csrfResp.ok) throw new Error('CSRF 토큰 발급에 실패했습니다.')
-      const readCookie = (name) => {
-        const prefix = `${encodeURIComponent(name)}=`
-        const cookie = document.cookie.split('; ').find(item => item.startsWith(prefix))
-        return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null
-      }
-      const csrfToken = readCookie('XSRF-TOKEN')
+      const csrfToken = await getCsrfToken()
 
       const resp = await fetch(`${API_BASE_URL}/users/me`, {
         method: 'PATCH',
@@ -421,14 +408,7 @@ export async function renderMyPage(container) {
       const formData = new FormData()
       formData.append('file', file)
 
-      const csrfResp = await fetch(`${API_BASE_URL}/auth/csrf`, { credentials: 'include' })
-      if (!csrfResp.ok) throw new Error('CSRF 토큰 발급에 실패했습니다.')
-      const readCookie = (name) => {
-        const prefix = `${encodeURIComponent(name)}=`
-        const cookie = document.cookie.split('; ').find(item => item.startsWith(prefix))
-        return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null
-      }
-      const csrfToken = readCookie('XSRF-TOKEN')
+      const csrfToken = await getCsrfToken()
 
       const profileUploadResp = await fetch(`${API_BASE_URL}/users/me/profile-image`, {
         method: 'POST',
@@ -476,17 +456,7 @@ export async function renderMyPage(container) {
   document.querySelector('#btn-mypage-revoke').addEventListener('click', async () => {
     if (confirm('위치 정보 이용 동의를 철회하시겠습니까?\n철회 시 등록된 선호위치와 대기 중인 모든 매칭 요청이 파기됩니다.')) {
       try {
-        const csrfResp = await fetch(`${API_BASE_URL}/auth/csrf`, { credentials: 'include' })
-        if (!csrfResp.ok) throw new Error('CSRF 토큰 발급에 실패했습니다.')
-
-        const readCookie = (name) => {
-          const prefix = `${encodeURIComponent(name)}=`
-          const cookie = document.cookie
-            .split('; ')
-            .find((item) => item.startsWith(prefix))
-          return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null
-        }
-        const csrfToken = readCookie('XSRF-TOKEN')
+        const csrfToken = await getCsrfToken()
 
         const resp = await fetch(`${API_BASE_URL}/users/me/preferred-region`, {
           method: 'DELETE',
@@ -512,17 +482,7 @@ export async function renderMyPage(container) {
   document.querySelector('#btn-mypage-withdraw')?.addEventListener('click', async () => {
     if (confirm('정말로 마주한끼를 탈퇴하시겠습니까?\n탈퇴 시 모든 데이터가 파기되며 되돌릴 수 없습니다.')) {
       try {
-        const csrfResp = await fetch(`${API_BASE_URL}/auth/csrf`, { credentials: 'include' })
-        if (!csrfResp.ok) throw new Error('CSRF 토큰 발급에 실패했습니다.')
-
-        const readCookie = (name) => {
-          const prefix = `${encodeURIComponent(name)}=`
-          const cookie = document.cookie
-            .split('; ')
-            .find((item) => item.startsWith(prefix))
-          return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null
-        }
-        const csrfToken = readCookie('XSRF-TOKEN')
+        const csrfToken = await getCsrfToken()
 
         const resp = await fetch(`${API_BASE_URL}/users/me`, {
           method: 'DELETE',

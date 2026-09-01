@@ -74,7 +74,7 @@ sequenceDiagram
   * 로그인 엔드포인트는 외부 제공자(카카오)와의 브라우저 이동이므로 CSRF 검사를 비활성화합니다.
 * **`apiSecurityFilterChain` (`Order(2)`, 나머지 모든 API)**:
   * 완전한 무상태(`SessionCreationPolicy.STATELESS`)를 유지합니다.
-  * Cookie-to-Header 기반 CSRF 방어(`CookieCsrfTokenRepository` + `SpaCsrfTokenRequestHandler`) 및 JWT 인증 필터(`JwtFilter`)를 적용합니다.
+  * Cookie-to-Header 기반 CSRF 방어(`CookieCsrfTokenRepository` + `SpaCsrfTokenRequestHandler`) 및 JWT 인증 필터(`JwtFilter`)를 적용합니다. 프론트엔드는 `GET /auth/csrf` 응답의 `data.token`을 `X-XSRF-TOKEN` 헤더로 전송하며, 다른 Origin의 CSRF 쿠키를 직접 읽지 않습니다.
 
 ---
 
@@ -125,7 +125,7 @@ response.sendRedirect(redirectUri);
 * 클라이언트가 `POST /auth/oauth2/exchange`로 `{ "code": "..." }`를 제출하면 동작합니다.
 * Redis에서 인가 코드를 검증 및 소모하고 유저 상태를 확인합니다.
 * **Access Token (JWT)**: 만료시간 15분, 응답 Body에 담아 전달.
-* **Refresh Token (Opaque Token)**: 만료시간 14일, DB에 SHA-256 해시로 저장 후 클라이언트에는 `Set-Cookie` 헤더(`HttpOnly=true`, `Secure=true`, `SameSite=Strict`)로 전달.
+* **Refresh Token (Opaque Token)**: 만료시간 14일, DB에 SHA-256 해시로 저장 후 클라이언트에는 `Set-Cookie` 헤더로 전달한다. 개발 프로필은 `HttpOnly=true`, `Secure=false`, `SameSite=Lax`, 운영 프로필은 `HttpOnly=true`, `Secure=true`, `SameSite=None`을 사용한다.
 
 ---
 

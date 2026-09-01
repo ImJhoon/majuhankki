@@ -79,7 +79,7 @@ public class PersonalityProfileController {
             description = "네 가지 카드 응답과 태그를 최초 저장하거나 전체 교체합니다. 인증 쿠키와 CSRF 토큰이 필요합니다."
     )
     @Parameter(name = "X-XSRF-TOKEN", in = ParameterIn.HEADER, required = true,
-            description = "GET /auth/csrf로 발급받은 XSRF-TOKEN 쿠키 값")
+            description = "GET /auth/csrf 응답의 data.token")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "제출 성공"),
             @ApiResponse(responseCode = "401", description = "인증 필요",
@@ -111,7 +111,7 @@ public class PersonalityProfileController {
             description = "AI 분석 동의가 있는 자기소개에서 태그를 최대 5개 제안합니다. 제안은 프로필에 자동 저장되지 않습니다."
     )
     @Parameter(name = "X-XSRF-TOKEN", in = ParameterIn.HEADER, required = true,
-            description = "GET /auth/csrf로 발급받은 XSRF-TOKEN 쿠키 값")
+            description = "GET /auth/csrf 응답의 data.token")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "추천 요청 처리 성공. AI를 사용할 수 없으면 available=false"),
             @ApiResponse(responseCode = "401", description = "인증 필요",
@@ -133,7 +133,7 @@ public class PersonalityProfileController {
             description = "프로필, 원본 응답, 태그와 파생 데이터를 삭제하고 온보딩 상태를 NOT_STARTED로 변경합니다."
     )
     @Parameter(name = "X-XSRF-TOKEN", in = ParameterIn.HEADER, required = true,
-            description = "GET /auth/csrf로 발급받은 XSRF-TOKEN 쿠키 값")
+            description = "GET /auth/csrf 응답의 data.token")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "초기화 성공"),
             @ApiResponse(responseCode = "401", description = "인증 필요",
@@ -154,7 +154,7 @@ public class PersonalityProfileController {
             description = "프로필이 없는 사용자의 온보딩 상태를 SKIPPED로 저장합니다."
     )
     @Parameter(name = "X-XSRF-TOKEN", in = ParameterIn.HEADER, required = true,
-            description = "GET /auth/csrf로 발급받은 XSRF-TOKEN 쿠키 값")
+            description = "GET /auth/csrf 응답의 data.token")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "건너뛰기 저장 성공"),
             @ApiResponse(responseCode = "401", description = "인증 필요",

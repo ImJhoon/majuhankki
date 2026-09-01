@@ -1,5 +1,6 @@
 package org.example.project2.global.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.project2.domain.auth.controller.CsrfController;
 import org.example.project2.domain.user.entity.UserRole;
 import org.example.project2.global.security.csrf.CsrfCookieFilter;
@@ -24,6 +25,8 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.mock.web.MockHttpSession;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -53,7 +56,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
                 "app.auth.jwt.access-token-expiry=15m",
                 "app.auth.jwt.refresh-token-expiry=14d",
                 "app.auth.jwt.max-active-sessions=5",
-                "app.auth.cors.allowed-origin=https://frontend.example"
+                "app.auth.cors.allowed-origin=https://frontend.example",
+                "app.security.cookie.secure=false",
+                "app.security.cookie.same-site=Lax"
         }
 )
 @Import({
@@ -73,6 +78,8 @@ class SecurityIntegrationTest {
 
     @Autowired
     private JwtProvider jwtProvider;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @MockitoBean
     private JpaMetamodelMappingContext jpaMappingContext;
@@ -108,9 +115,12 @@ class SecurityIntegrationTest {
     }
 
     @Test
-    void csrfCookieIsIssuedOnSafeRequest() throws Exception {
-        MvcResult result = mockMvc.perform(get("/auth/csrf"))
-                .andExpect(status().isNoContent())
+    @DirtiesContext(methodMode = DirtiesContext.MethodMode.BEFORE_METHOD)
+    void csrfTokenIsReturnedAndCookieIsIssuedOnSafeRequest() throws Exception {
+        MvcResult result = mockMvc.perform(get("/auth/csrf").session(new MockHttpSession()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.token").isString())
                 .andExpect(cookie().exists("XSRF-TOKEN"))
                 .andExpect(cookie().secure("XSRF-TOKEN", false))
                 .andExpect(cookie().httpOnly("XSRF-TOKEN", false))
@@ -119,6 +129,16 @@ class SecurityIntegrationTest {
                         .getAttribute("SameSite"))
                         .isEqualTo("Lax"))
                 .andReturn();
+
+        String responseToken = objectMapper.readTree(result.getResponse().getContentAsString())
+                .path("data")
+                .path("token")
+                .asText();
+        assertThat(result.getResponse().getHeaders(HttpHeaders.SET_COOKIE))
+                .as("Set-Cookie headers")
+                .anyMatch(header -> header.startsWith("XSRF-TOKEN=" + responseToken + ";")
+                        && header.contains("Path=/")
+                        && !header.contains("Max-Age=0"));
 
         assertThat(result.getResponse().getHeaders(HttpHeaders.SET_COOKIE))
                 .anyMatch(header -> header.startsWith("XSRF-TOKEN=")
@@ -151,14 +171,17 @@ class SecurityIntegrationTest {
 
     @Test
     void csrfCookieValueIsAcceptedInXsrfHeader() throws Exception {
-        MvcResult csrfResponse = mockMvc.perform(get("/auth/csrf"))
-                .andExpect(status().isNoContent())
+        MvcResult csrfResponse = mockMvc.perform(get("/auth/csrf").session(new MockHttpSession()))
+                .andExpect(status().isOk())
                 .andReturn();
-        jakarta.servlet.http.Cookie csrfCookie = csrfResponse.getResponse().getCookie("XSRF-TOKEN");
+        String responseToken = objectMapper.readTree(csrfResponse.getResponse().getContentAsString())
+                .path("data")
+                .path("token")
+                .asText();
 
         mockMvc.perform(post("/auth/login")
-                        .cookie(csrfCookie)
-                        .header("X-XSRF-TOKEN", csrfCookie.getValue()))
+                        .cookie(new jakarta.servlet.http.Cookie("XSRF-TOKEN", responseToken))
+                        .header("X-XSRF-TOKEN", responseToken))
                 .andExpect(status().isNotFound());
     }
 
@@ -177,6 +200,14 @@ class SecurityIntegrationTest {
     void unconfiguredOriginIsRejected() throws Exception {
         mockMvc.perform(options("/auth/login")
                         .header(HttpHeaders.ORIGIN, "https://untrusted.example")
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.POST.name()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void nullOriginIsRejected() throws Exception {
+        mockMvc.perform(options("/auth/login")
+                        .header(HttpHeaders.ORIGIN, "null")
                         .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.POST.name()))
                 .andExpect(status().isForbidden());
     }
