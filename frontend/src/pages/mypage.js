@@ -196,17 +196,15 @@ export async function renderMyPage(container) {
 
   await loadDasiHankkiScore()
 
-  let currentHistoryPage = 0
-
-  const loadMatchHistory = async (page = currentHistoryPage) => {
+  const loadMatchHistory = async () => {
     const historyContainer = document.querySelector('#mypage-match-history')
     if (!historyContainer) return
 
     try {
-      const response = await fetch(`${API_BASE_URL}/matches/history?page=${page}&size=10`, { credentials: 'include' })
+      const response = await fetch(`${API_BASE_URL}/matches/history?page=0&size=10`, { credentials: 'include' })
       const body = await response.json()
       const pageData = body.success && body.data ? body.data : null
-      const history = pageData && Array.isArray(pageData.content) ? pageData.content : []
+      const history = pageData && Array.isArray(pageData.content) ? pageData.content.slice(0, 5) : []
       if (history.length === 0) {
         historyContainer.innerHTML = '<p class="text-sm text-secondary text-center py-6">아직 매칭 이력이 없습니다.</p>'
         return
@@ -251,19 +249,6 @@ export async function renderMyPage(container) {
         </div>
         `
       }).join('')
-
-      currentHistoryPage = pageData.page
-      if (pageData.totalPages > 1) {
-        historyContainer.insertAdjacentHTML('beforeend', `
-          <div class="flex items-center justify-center gap-3 pt-2">
-            <button id="btn-history-prev" class="px-3 py-1.5 rounded-lg border border-outline-variant/30 text-xs font-bold text-secondary disabled:opacity-40" ${pageData.first ? 'disabled' : ''}>이전</button>
-            <span class="text-xs text-secondary">${pageData.page + 1} / ${pageData.totalPages}</span>
-            <button id="btn-history-next" class="px-3 py-1.5 rounded-lg border border-outline-variant/30 text-xs font-bold text-secondary disabled:opacity-40" ${pageData.last ? 'disabled' : ''}>다음</button>
-          </div>
-        `)
-        document.querySelector('#btn-history-prev')?.addEventListener('click', () => loadMatchHistory(currentHistoryPage - 1))
-        document.querySelector('#btn-history-next')?.addEventListener('click', () => loadMatchHistory(currentHistoryPage + 1))
-      }
 
       historyContainer.querySelectorAll('.btn-report-user').forEach(btn => {
         const item = history.find(historyItem => String(historyItem.matchId) === btn.getAttribute('data-match-id'))
@@ -366,7 +351,7 @@ export async function renderMyPage(container) {
         if (resp.ok) {
           alert('신고가 성공적으로 접수되었습니다. 소중한 의견 감사합니다.')
           modal.remove()
-          await loadMatchHistory(currentHistoryPage)
+          await loadMatchHistory()
         } else {
           const body = await resp.json()
           alert(body?.error?.message || '신고 접수에 실패했습니다.')

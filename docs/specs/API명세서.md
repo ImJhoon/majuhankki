@@ -467,11 +467,27 @@ V1 응답값은 `1`, `3`, `5`만 허용하며 각각 `0`, `50`, `100`점으로 �
   "partner": {
     "userId": "8ccaa7af-909f-44e7-84cb-67cdccb56be6",
     "nickname": "밥친구"
+  },
+  "desiredLocations": {
+    "mine": {
+      "locationName": "강남역 11번 출구",
+      "regionName": "서울특별시 강남구",
+      "foodCategory": "KOREAN",
+      "latitude": 37.498,
+      "longitude": 127.027
+    },
+    "partner": {
+      "locationName": "역삼역 3번 출구",
+      "regionName": "서울특별시 강남구",
+      "foodCategory": "JAPANESE",
+      "latitude": 37.501,
+      "longitude": 127.036
+    }
   }
 }
 ```
 
-`compatibility`는 저장된 호환도 스냅샷이 있을 때만 포함하며, `myScore`는 수신자의 희망 조건에서 상대방을 본 방향의 점수, `partnerScore`는 상대방의 희망 조건에서 수신자를 본 방향의 점수다. `score`는 정렬과 기존 호환성을 위한 양방향 최종 점수이며, 성향 데이터가 없는 방향은 기본 조건 fallback 사유로 표시할 수 있다. 원본 설문 답변, 자유 서술, 차원별 상세 점수, 임베딩 벡터와 정밀 위치는 상대방에게 노출하지 않는다. 동일한 결과를 재전송하더라도 매칭·채팅방 레코드를 중복 생성하지 않는다.
+`compatibility`는 저장된 호환도 스냅샷이 있을 때만 포함하며, `myScore`는 수신자의 희망 조건에서 상대방을 본 방향의 점수, `partnerScore`는 상대방의 희망 조건에서 수신자를 본 방향의 점수다. `score`는 정렬과 기존 호환성을 위한 양방향 최종 점수이며, 성향 데이터가 없는 방향은 기본 조건 fallback 사유로 표시할 수 있다. `desiredLocations.mine`과 `desiredLocations.partner`는 상호 수락이 끝난 매칭 참여자에게만 수신자 관점으로 제공하며, `match_requests.location`에 저장된 요청 시점의 희망 핀과 `foodCategory`이지 사용자의 실시간 위치가 아니다. 후보 제안 단계에는 이 좌표를 노출하지 않는다. 프런트엔드는 두 핀의 중간 지점 반경 1.5km에서 음식점은 `FD6`, 카페는 `CE7` 카테고리로 카테고리별 최대 3페이지·45곳을 정확도순 조회하고, 품질 필터를 통과한 중복 제거 후보가 8곳 미만이면 반경 3km로 다시 조회한다. 음식점 응답의 `category_name`을 선택 카테고리별 분류어와 대조하고 도로명 주소·전화번호·상세 URL 중 2개 이상이 있는 장소만 남긴다. 동일한 장소 ID를 합친 뒤 실제 적용한 탐색 반경을 기준으로 카테고리 정확성 40%, 중간 지점 거리 30%, 양쪽 거리 균형 20%, 정보 완성도 10%로 점수화해 전체 상위 10곳만 표시한다. 상호명에 `한식`, `중식` 등의 문자열이 포함되었는지는 필터 기준으로 사용하지 않는다. 이 결과는 평점·리뷰 품질을 보장하지 않는 주변 후보이며 영업 여부·품질·예약 가능성을 보장하지 않는다. 원본 설문 답변, 자유 서술, 차원별 상세 점수와 임베딩 벡터는 상대방에게 노출하지 않는다. 동일한 결과를 재전송하더라도 매칭·채팅방 레코드를 중복 생성하지 않는다.
 
 ### 희망 상대 성향 호환도 V1 산식
 
@@ -490,7 +506,7 @@ AI 모델 미설정·호출 실패·임베딩 불일치와 성향 미설정은 �
 
 **POST /matches/realtime/proposals/{proposalId}/decision**는 제안 당사자만 `ACCEPT` 또는 `REJECT`를 결정할 수 있도록 하며, 동일 결정은 멱등 처리한다. 제안이 만료되었거나 종료된 뒤의 결정 변경은 `409 MATCHING_012`로 거절한다.
 
-**GET /matches/realtime/results/latest**는 인증 사용자가 참여한 가장 최근 매칭의 `matchId`, `status`, `chatRoomId`, 호환도와 상대방 공개 프로필을 반환한다. WebSocket 결과 이벤트를 수신하지 못했거나 연결이 끊긴 경우 복구 조회에 사용한다. 참여한 매칭이 없거나 결과 구성에 필요한 확정 제안·채팅방이 없으면 `404 MATCHING_013`을 반환한다.
+**GET /matches/realtime/results/latest**는 인증 사용자가 참여한 가장 최근 매칭의 `matchId`, `status`, `chatRoomId`, 호환도, 상대방 공개 프로필과 수신자 기준의 양쪽 희망 장소를 반환한다. WebSocket 결과 이벤트를 수신하지 못했거나 연결이 끊긴 경우 복구 조회에 사용한다. 프런트엔드는 WebSocket 이벤트 또는 이 복구 응답에서 `status=MATCHED`와 `chatRoomId`를 확인하면 해당 채팅방으로 즉시 자동 이동하고, `desiredLocations`의 두 핀을 지도에 표시한다. 참여한 매칭이 없거나 결과 구성에 필요한 확정 제안·채팅방이 없으면 `404 MATCHING_013`을 반환한다.
 
 WebSocket `/ws-chat` 핸드셰이크는 HttpOnly `accessToken` 쿠키의 서명·발급자·대상·만료를 검증한다. 허용 Origin은 `FRONTEND_ORIGIN`과 동일하게 제한하고 미설정 환경은 동일 출처만 허용한다. 인증된 세션은 `/user/queue/match-proposal`, `/user/queue/match-result` 및 참여 중인 `/topic/chat/{roomId}`만 구독할 수 있으며, 지원하지 않는 구독·전송 경로는 거절한다.
 
@@ -563,12 +579,62 @@ Query: `cursor` (마지막으로 받은 messageId), `size` (기본 30)
   "success": true,
   "data": {
     "content": [
-      { "messageId": 1001, "senderId": "8ccaa7af-909f-44e7-84cb-67cdccb56be6", "content": "안녕하세요!", "sentAt": "2026-08-21T19:02:00+09:00" }
+      {
+        "messageId": 1001,
+        "senderId": "8ccaa7af-909f-44e7-84cb-67cdccb56be6",
+        "messageType": "TEXT",
+        "content": "안녕하세요!",
+        "place": null,
+        "sentAt": "2026-08-21T19:02:00+09:00"
+      },
+      {
+        "messageId": 1002,
+        "senderId": "8ccaa7af-909f-44e7-84cb-67cdccb56be6",
+        "messageType": "PLACE",
+        "content": "마주식당",
+        "place": {
+          "providerPlaceId": "123456789",
+          "name": "마주식당",
+          "category": "음식점 > 한식",
+          "address": "서울특별시 강남구 테헤란로 1",
+          "latitude": 37.498,
+          "longitude": 127.027,
+          "placeUrl": "https://place.map.kakao.com/123456789"
+        },
+        "sentAt": "2026-08-21T19:03:00+09:00"
+      }
     ],
     "hasNext": true
   }
 }
 ```
+
+**STOMP SEND `/app/chat/{roomId}/send`**
+
+텍스트 메시지는 기존 요청과 호환되며 `messageType`을 생략하면 `TEXT`로 처리한다.
+
+```json
+{ "roomId": 101, "messageType": "TEXT", "message": "여기 어떠세요?" }
+```
+
+식당 공유 메시지는 지도 검색 결과의 Kakao 장소 ID와 표시용 스냅샷을 전송한다. `sender`는 요청에서 받지 않고 인증 principal로 결정한다. `placeUrl`은 클라이언트 값을 저장하지 않으며 서버가 검증된 숫자형 `providerPlaceId`로 `https://place.map.kakao.com/{providerPlaceId}` 형식으로 재구성한다.
+
+```json
+{
+  "roomId": 101,
+  "messageType": "PLACE",
+  "place": {
+    "providerPlaceId": "123456789",
+    "name": "마주식당",
+    "category": "음식점 > 한식",
+    "address": "서울특별시 강남구 테헤란로 1",
+    "latitude": 37.498,
+    "longitude": 127.027
+  }
+}
+```
+
+서버는 저장 후 `/topic/chat/{roomId}`에 `roomId`, 인증된 `sender`, `messageType`, `message`, `place`를 브로드캐스트한다. `PLACE` 메시지의 장소 ID·이름·카테고리·주소·좌표는 모두 필수이며 이름 200자, 카테고리 200자, 주소 500자 제한을 적용한다. 좌표는 위도 `-90..90`, 경도 `-180..180` 범위여야 한다.
 
 ---
 
@@ -694,7 +760,7 @@ API와 DB에는 안정적인 영문 코드만 사용하고, 한국어 문구는 
 
 회원 정보 수정은 1장의 `PATCH /users/me`를 그대로 재사용하는 것을 권장 (마이페이지 화면 전용 PATCH 엔드포인트를 따로 만들면 로직이 중복됨).
 
-`GET /matches/history?page=0&size=10`은 인증된 사용자가 참여한 매칭 이력을 최신순으로 10건씩 페이지네이션하여 반환하며, 상대 닉네임·공개 프로필 이미지·매칭 상태·성사 시각·지역명·음식 카테고리만 포함한다. `size`는 10만 허용한다.
+`GET /matches/history?page=0&size=10`은 인증된 사용자가 참여한 매칭 이력을 최신순으로 10건씩 페이지네이션하여 반환하며, 상대 닉네임·공개 프로필 이미지·매칭 상태·성사 시각·지역명·음식 카테고리만 포함한다. `size`는 10만 허용한다. 마이페이지 MVP 화면은 첫 페이지 응답 중 최신 5건만 표시하며 페이지 이동 UI는 제공하지 않는다. 화면 표시 제한은 과거 매칭 데이터의 삭제나 신고·운영 조회 범위 축소를 의미하지 않는다.
 
 </aside>
 

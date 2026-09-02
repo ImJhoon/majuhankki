@@ -3,9 +3,31 @@ import { getCsrfToken } from '../auth/csrf.js'
 import { navigateTo } from '../main.js'
 import { getLatestMatchResult } from '../matching/matching-api.js'
 import { API_BASE_URL } from '../config/api.js'
+import './chat.css'
+
+const FOOD_CATEGORY_DETAILS = {
+  KOREAN: { label: '한식', groupCode: 'FD6', categoryKeywords: ['한식'] },
+  JAPANESE: { label: '일식', groupCode: 'FD6', categoryKeywords: ['일식', '일본음식'] },
+  CHINESE: { label: '중식', groupCode: 'FD6', categoryKeywords: ['중식', '중국요리'] },
+  WESTERN: { label: '양식', groupCode: 'FD6', categoryKeywords: ['양식'] },
+  SOUTHEAST_ASIAN: {
+    label: '동남아 음식',
+    groupCode: 'FD6',
+    categoryKeywords: ['동남아음식', '아시아음식', '베트남음식', '태국음식', '인도음식'],
+  },
+  SNACK: { label: '분식', groupCode: 'FD6', categoryKeywords: ['분식'] },
+  FAST_FOOD: { label: '패스트푸드', groupCode: 'FD6', categoryKeywords: ['패스트푸드'] },
+  CAFE_DESSERT: { label: '카페·디저트', groupCode: 'CE7', categoryKeywords: [] },
+}
+
+const MAX_RESTAURANT_SEARCH_PAGES = 3
+const MAX_DISPLAYED_RESTAURANTS = 10
+const PRIMARY_RESTAURANT_SEARCH_RADIUS_METERS = 1500
+const EXPANDED_RESTAURANT_SEARCH_RADIUS_METERS = 3000
+const MIN_RESTAURANT_CANDIDATES_BEFORE_EXPANSION = 8
 
 /**
- * 채팅 페이지 (카카오톡 스타일 UI)
+ * 마주한끼 테마의 1:1 채팅 페이지
  * - project2.isLoggedIn 이 true 인 경우에만 접근 가능
  * - STOMP CONNECT 헤더에 JWT 쿠키를 포함 (HttpOnly 쿠키는 브라우저가 자동 전송)
  * - /app/chat/{roomId}/send 로 전송, /topic/chat/{roomId} 구독
@@ -18,36 +40,95 @@ export function renderChatPage(container) {
   }
 
   container.innerHTML = `
-    <main class="w-full max-w-6xl mx-auto my-6 px-4 flex flex-col min-h-[600px]">
-      <!-- Header -->
-      <div class="flex items-center justify-between border-b border-slate-200 pb-4 mb-4">
-        <div>
-          <h2 class="text-2xl font-extrabold text-brand-navy">1:1 실시간 채팅</h2>
-          <p class="text-xs text-secondary mt-1">상태: <span id="disp-status" class="font-bold text-slate-500">미연결</span></p>
-        </div>
-        <div class="flex items-center gap-2">
-          <button id="btn-end-match" class="px-4 py-2 rounded-full text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100">매칭 종료</button>
-          <button id="btn-back" class="btn-secondary px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1">
-            <span class="material-symbols-outlined text-sm">arrow_back</span>
-            뒤로가기
+    <main class="chat-page">
+      <div class="chat-layout">
+        <section class="chat-shell" aria-labelledby="chat-partner-name">
+        <header class="chat-header">
+          <button id="btn-back" class="chat-icon-button" type="button" aria-label="채팅방 나가기">
+            <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
           </button>
-        </div>
-      </div>
 
-      <!-- KakaoTalk Style Chat Window -->
-      <div class="w-full flex flex-col h-[550px] border border-outline-variant/30 rounded-card overflow-hidden shadow-floating bg-[#BACEE0]">
-        <!-- Messages Area -->
-        <div id="chat-box" class="flex-grow overflow-y-auto p-4 space-y-4">
-          <div class="text-center my-2 text-xs text-slate-600 bg-white/40 rounded-full px-4 py-1 w-fit mx-auto shadow-sm">
-             채팅방에 입장해 주세요.
+          <div class="chat-partner">
+            <div class="chat-partner-avatar" aria-hidden="true">
+              <span id="chat-partner-initial">상</span>
+              <img id="chat-partner-image" class="is-hidden" alt="" />
+            </div>
+            <div class="chat-partner-copy">
+              <h1 id="chat-partner-name">밥친구와의 대화</h1>
+            </div>
+          </div>
+
+          <button id="btn-end-match" class="chat-end-button" type="button">
+            <span class="material-symbols-outlined" aria-hidden="true">logout</span>
+            <span>매칭 종료</span>
+          </button>
+        </header>
+
+        <div id="chat-box" class="chat-messages" role="log" aria-live="polite" aria-label="채팅 메시지">
+          <div class="chat-system-message">
+            <span class="material-symbols-outlined" aria-hidden="true">waving_hand</span>
+            <span>따뜻한 인사로 대화를 시작해 보세요.</span>
           </div>
         </div>
 
-        <!-- Input Area -->
-        <div class="bg-white border-t border-slate-200 p-3 flex gap-2">
-          <input type="text" id="msg-input" placeholder="메시지를 입력하세요..." disabled class="flex-grow bg-slate-100 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-container outline-none" />
-          <button id="btn-send" disabled class="btn-primary px-5 py-2 rounded-xl text-sm font-bold shadow-md disabled:opacity-50 disabled:cursor-not-allowed">전송</button>
+        <div class="chat-composer">
+          <input type="text" id="msg-input" placeholder="메시지를 입력하세요" disabled aria-label="메시지 입력" />
+          <button id="btn-send" type="button" disabled aria-label="메시지 전송">
+            <span class="material-symbols-outlined" aria-hidden="true">send</span>
+          </button>
         </div>
+        </section>
+
+        <aside class="chat-map-panel" aria-labelledby="chat-map-title">
+          <header class="chat-map-header">
+            <div>
+              <p class="chat-map-eyebrow">약속 위치 맞추기</p>
+              <h2 id="chat-map-title">서로 선택한 위치</h2>
+            </div>
+            <span class="chat-map-header-icon material-symbols-outlined" aria-hidden="true">map</span>
+          </header>
+
+          <div class="chat-map-canvas-wrap">
+            <div id="chat-location-map" class="chat-map-canvas" aria-label="양쪽 사용자의 희망 매칭 위치 지도"></div>
+            <div id="chat-restaurant-legend" class="chat-restaurant-legend is-hidden" aria-label="식당 후보 범례">
+              <span class="is-mine">
+                <span class="material-symbols-outlined" aria-hidden="true">restaurant</span>
+                <span id="chat-my-food-label">내 메뉴</span>
+              </span>
+              <span class="is-partner">
+                <span class="material-symbols-outlined" aria-hidden="true">restaurant</span>
+                <span id="chat-partner-food-label">상대 메뉴</span>
+              </span>
+            </div>
+            <div id="chat-restaurant-status" class="chat-restaurant-status is-hidden"></div>
+            <div id="chat-map-status" class="chat-map-status">
+              <span class="material-symbols-outlined" aria-hidden="true">progress_activity</span>
+              <span>희망 위치를 불러오고 있어요.</span>
+            </div>
+          </div>
+
+          <div class="chat-location-list">
+            <article class="chat-location-card is-mine">
+              <div>
+                <p>내가 선택한 위치</p>
+                <strong id="chat-my-location-name">확인 중</strong>
+                <span id="chat-my-region-name"></span>
+              </div>
+            </article>
+            <article class="chat-location-card is-partner">
+              <div>
+                <p><span id="chat-location-partner-name">상대방</span>님이 선택한 위치</p>
+                <strong id="chat-partner-location-name">확인 중</strong>
+                <span id="chat-partner-region-name"></span>
+              </div>
+            </article>
+          </div>
+
+          <p class="chat-map-notice">
+            <span class="material-symbols-outlined" aria-hidden="true">info</span>
+            실시간 위치가 아니라 매칭 요청 시 각자 선택한 희망 장소예요.
+          </p>
+        </aside>
       </div>
     </main>
   `
@@ -62,8 +143,11 @@ export function renderChatPage(container) {
   let partnerUserId = null
   let partnerProfileImg = null
   let matchId      = null
+  let desiredLocations = null
+  let locationMap = null
+  let activePlaceOverlay = null
 
-  // ── 카카오톡 스타일 말풍선 렌더링 ──────────────────────────────────────────────
+  // ── 메시지 말풍선 렌더링 ───────────────────────────────────────────────────
   function appendChatMessage(senderId, nickname, message, isMine, customTime = null) {
     const box = document.getElementById('chat-box')
     if (!box) return
@@ -72,34 +156,121 @@ export function renderChatPage(container) {
     const timeVal = customTime ? new Date(customTime) : new Date()
     const timeStr = timeVal.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     
+    row.className = `chat-message-row ${isMine ? 'is-mine' : 'is-partner'}`
+
     if (isMine) {
-      row.className = 'flex justify-end items-end gap-1.5 mb-1.5 w-full'
       row.innerHTML = `
-        <span class="text-[9px] text-slate-600/80 mb-0.5 select-none">${timeStr}</span>
-        <div class="bg-[#FEE500] text-black text-sm p-2.5 rounded-l-2xl rounded-br-2xl max-w-[85%] shadow-sm whitespace-pre-wrap break-words border border-[#E4CE00]/30">${escapeHtml(message)}</div>
+        <time class="chat-message-time">${timeStr}</time>
+        <div class="chat-message-bubble">${escapeHtml(message)}</div>
       `
     } else {
-      row.className = 'flex items-start gap-2.5 mb-1.5 w-full'
       const initial = escapeHtml(nickname ? nickname.trim().charAt(0) : '상')
-      
-      const avatarHtml = partnerProfileImg
-        ? `<img src="${escapeHtml(partnerProfileImg)}" class="w-10 h-10 rounded-full object-cover shrink-0 shadow-sm border border-slate-200" alt="avatar" />`
-        : `<div class="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-brand-navy font-bold shrink-0 text-sm shadow-sm select-none">${initial}</div>`
 
       row.innerHTML = `
-        ${avatarHtml}
-        <div class="flex flex-col">
-          <span class="text-[11px] text-slate-700 mb-0.5 font-semibold select-none">${escapeHtml(nickname || '상대방')}</span>
-          <div class="flex items-end gap-1.5">
-            <div class="bg-white text-black text-sm p-2.5 rounded-r-2xl rounded-bl-2xl max-w-[85%] shadow-sm whitespace-pre-wrap break-words border border-slate-200">${escapeHtml(message)}</div>
-            <span class="text-[9px] text-slate-600/80 mb-0.5 select-none">${timeStr}</span>
+        <div class="chat-message-avatar" aria-hidden="true">
+          <span>${initial}</span>
+          ${partnerProfileImg ? `<img data-chat-avatar-image src="${escapeHtml(partnerProfileImg)}" alt="" />` : ''}
+        </div>
+        <div class="chat-message-content">
+          <span class="chat-message-name">${escapeHtml(nickname || '상대방')}</span>
+          <div class="chat-message-line">
+            <div class="chat-message-bubble">${escapeHtml(message)}</div>
+            <time class="chat-message-time">${timeStr}</time>
           </div>
         </div>
       `
+
+      row.querySelector('[data-chat-avatar-image]')?.addEventListener('error', (event) => {
+        event.currentTarget.remove()
+      }, { once: true })
     }
 
     box.appendChild(row)
     box.scrollTop = box.scrollHeight
+  }
+
+  function appendPlaceMessage(senderId, nickname, place, isMine, customTime = null) {
+    const box = document.getElementById('chat-box')
+    if (!box || !isValidSharedPlace(place)) return
+
+    const row = document.createElement('div')
+    const timeVal = customTime ? new Date(customTime) : new Date()
+    const timeStr = timeVal.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    row.className = `chat-message-row chat-place-message-row ${isMine ? 'is-mine' : 'is-partner'}`
+
+    const card = createPlaceMessageCard(place)
+    const time = document.createElement('time')
+    time.className = 'chat-message-time'
+    time.textContent = timeStr
+
+    if (isMine) {
+      row.append(time, card)
+    } else {
+      const avatar = document.createElement('div')
+      avatar.className = 'chat-message-avatar'
+      avatar.setAttribute('aria-hidden', 'true')
+      const initial = document.createElement('span')
+      initial.textContent = nickname ? nickname.trim().charAt(0) : '상'
+      avatar.append(initial)
+      if (partnerProfileImg) {
+        const image = document.createElement('img')
+        image.src = partnerProfileImg
+        image.alt = ''
+        image.addEventListener('error', () => image.remove(), { once: true })
+        avatar.append(image)
+      }
+
+      const content = document.createElement('div')
+      content.className = 'chat-message-content'
+      const name = document.createElement('span')
+      name.className = 'chat-message-name'
+      name.textContent = nickname || '상대방'
+      const line = document.createElement('div')
+      line.className = 'chat-message-line'
+      line.append(card, time)
+      content.append(name, line)
+      row.append(avatar, content)
+    }
+
+    box.appendChild(row)
+    box.scrollTop = box.scrollHeight
+  }
+
+  function createPlaceMessageCard(place) {
+    const card = document.createElement('article')
+    card.className = 'chat-place-message-card'
+
+    const eyebrow = document.createElement('span')
+    eyebrow.className = 'chat-place-message-eyebrow'
+    eyebrow.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">restaurant</span> 식당 공유'
+    const name = document.createElement('strong')
+    name.textContent = place.name
+    const category = document.createElement('span')
+    category.className = 'chat-place-message-category'
+    category.textContent = place.category
+    const address = document.createElement('p')
+    address.textContent = place.address
+    const actions = document.createElement('div')
+    actions.className = 'chat-place-message-actions'
+    const focusButton = document.createElement('button')
+    focusButton.type = 'button'
+    focusButton.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">location_on</span> 지도에서 보기'
+    focusButton.addEventListener('click', () => focusSharedPlaceOnMap(place))
+    actions.append(focusButton)
+
+    const safePlaceUrl = getSafePlaceUrl(place)
+    if (safePlaceUrl) {
+      const link = document.createElement('a')
+      link.href = safePlaceUrl
+      link.target = '_blank'
+      link.rel = 'noopener noreferrer'
+      link.setAttribute('aria-label', `${place.name} 카카오맵에서 열기`)
+      link.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>'
+      actions.append(link)
+    }
+
+    card.append(eyebrow, name, category, address, actions)
+    return card
   }
 
   function appendSystemMessage(text, color = 'slate-600') {
@@ -107,7 +278,8 @@ export function renderChatPage(container) {
     if (!box) return
 
     const line = document.createElement('div')
-    line.className = `text-center my-2 text-xs text-${color} bg-white/40 rounded-full px-4 py-1.5 w-fit mx-auto shadow-sm select-none`
+    const tone = color.startsWith('red') ? 'is-error' : color.startsWith('green') ? 'is-success' : ''
+    line.className = `chat-system-message ${tone}`.trim()
     line.textContent = text
     box.appendChild(line)
     box.scrollTop = box.scrollHeight
@@ -127,7 +299,7 @@ export function renderChatPage(container) {
     const roomId = roomIdFromQuery
     if (!/^\d+$/.test(roomId || '')) return
     connectedRoomId = roomId
-    document.getElementById('disp-status').textContent  = '연결 중...'
+    setConnectionStatus('연결 중…', 'connecting')
 
     const SockJS = window.SockJS
     const Stomp  = window.Stomp
@@ -143,7 +315,7 @@ export function renderChatPage(container) {
 
     stompClient.connect({}, function () {
       appendSystemMessage('채팅방 연결 성공!', 'green-700')
-      document.getElementById('disp-status').textContent = '연결됨'
+      setConnectionStatus('대화할 수 있어요', 'connected')
 
       const btnEndMatch = document.getElementById('btn-end-match')
       if (btnEndMatch) btnEndMatch.disabled = false
@@ -159,7 +331,11 @@ export function renderChatPage(container) {
             body.data.content.forEach(msg => {
               const isMine = msg.senderId === myUserId
               const nickname = isMine ? '나' : (msg.senderId === partnerUserId ? partnerNickname : '상대방')
-              appendChatMessage(msg.senderId, nickname, msg.content, isMine, msg.sentAt)
+              if (msg.messageType === 'PLACE' && msg.place) {
+                appendPlaceMessage(msg.senderId, nickname, msg.place, isMine, msg.sentAt)
+              } else {
+                appendChatMessage(msg.senderId, nickname, msg.content, isMine, msg.sentAt)
+              }
             })
             appendSystemMessage('이전 대화 내역을 불러왔습니다.')
           }
@@ -192,7 +368,11 @@ export function renderChatPage(container) {
 
         const isMine = body.sender === myUserId
         const nickname = isMine ? '나' : (body.sender === partnerUserId ? partnerNickname : '상대방')
-        appendChatMessage(body.sender, nickname, body.message, isMine)
+        if (body.messageType === 'PLACE' && body.place) {
+          appendPlaceMessage(body.sender, nickname, body.place, isMine)
+        } else {
+          appendChatMessage(body.sender, nickname, body.message, isMine)
+        }
       })
 
       appendSystemMessage(`채팅방 ${roomId}번에 입장하였습니다.`)
@@ -200,7 +380,7 @@ export function renderChatPage(container) {
       document.getElementById('btn-send').disabled  = false
     }, function (err) {
       appendSystemMessage('연결 실패: ' + err, 'red-700')
-      document.getElementById('disp-status').textContent = '연결 실패'
+      setConnectionStatus('연결 실패', 'error')
     })
   }
 
@@ -229,15 +409,495 @@ export function renderChatPage(container) {
     document.getElementById('msg-input').value = ''
   }
 
+  function sendPlaceMessage(candidate) {
+    const roomId = roomIdFromQuery
+    const place = candidate?.place
+    if (!stompClient || !/^\d+$/.test(roomId || '') || !place?.id) {
+      showRestaurantStatus('채팅 연결 후 식당을 공유할 수 있어요.', true)
+      return
+    }
+
+    const address = place.road_address_name || place.address_name
+    const latitude = Number(place.y)
+    const longitude = Number(place.x)
+    if (!address || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      showRestaurantStatus('공유할 식당 정보가 충분하지 않아요.', true)
+      return
+    }
+
+    stompClient.send(
+      `/app/chat/${roomId}/send`,
+      {},
+      JSON.stringify({
+        roomId: Number(roomId),
+        messageType: 'PLACE',
+        place: {
+          providerPlaceId: String(place.id),
+          name: place.place_name,
+          category: place.category_name || '음식점',
+          address,
+          latitude,
+          longitude,
+        },
+      }),
+    )
+    showRestaurantStatus(`${place.place_name}을(를) 채팅에 공유했어요.`)
+  }
+
   // ── UI 초기화 ──────────────────────────────────────────────────────────────
   function resetUI() {
-    document.getElementById('disp-status').textContent  = '미연결'
+    setConnectionStatus('미연결')
     const btnEndMatch = document.getElementById('btn-end-match')
     if (btnEndMatch) btnEndMatch.disabled = false
     document.getElementById('msg-input').disabled       = true
     document.getElementById('btn-send').disabled        = true
     stompClient  = null
     subscription = null
+  }
+
+  function setConnectionStatus(text, state = '') {
+    const status = document.getElementById('disp-status')
+    const indicator = document.getElementById('connection-indicator')
+    if (status) status.textContent = text
+    if (indicator) indicator.className = `chat-connection-dot ${state ? `is-${state}` : ''}`.trim()
+  }
+
+  function updatePartnerHeader() {
+    const name = document.getElementById('chat-partner-name')
+    const initial = document.getElementById('chat-partner-initial')
+    const image = document.getElementById('chat-partner-image')
+    if (name) name.textContent = `${partnerNickname}님과의 대화`
+    if (initial) initial.textContent = partnerNickname.trim().charAt(0) || '상'
+    if (!image || !partnerProfileImg) return
+
+    image.src = partnerProfileImg
+    image.classList.remove('is-hidden')
+    image.addEventListener('error', () => image.classList.add('is-hidden'), { once: true })
+  }
+
+  function renderDesiredLocations(locations) {
+    desiredLocations = locations
+    const mine = locations?.mine
+    const partner = locations?.partner
+    const partnerLabel = document.getElementById('chat-location-partner-name')
+    if (partnerLabel) partnerLabel.textContent = partnerNickname
+
+    if (!isValidLocation(mine) || !isValidLocation(partner)) {
+      showMapStatus('희망 위치 정보를 확인할 수 없어요.', 'location_off')
+      return
+    }
+
+    setText('chat-my-location-name', mine.locationName || mine.regionName)
+    setText('chat-my-region-name', mine.locationName ? mine.regionName : '')
+    setText('chat-partner-location-name', partner.locationName || partner.regionName)
+    setText('chat-partner-region-name', partner.locationName ? partner.regionName : '')
+    initializeLocationMap(mine, partner)
+  }
+
+  function initializeLocationMap(mine, partner) {
+    let attempts = 0
+    const waitForKakao = setInterval(() => {
+      attempts += 1
+      if (window.kakao?.maps) {
+        clearInterval(waitForKakao)
+        window.kakao.maps.load(() => createLocationMap(mine, partner))
+        return
+      }
+      if (attempts >= 50) {
+        clearInterval(waitForKakao)
+        showMapStatus('지도를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.', 'map_off')
+      }
+    }, 100)
+  }
+
+  function createLocationMap(mine, partner) {
+    const mapContainer = document.getElementById('chat-location-map')
+    if (!mapContainer || !desiredLocations) return
+
+    const kakaoMaps = window.kakao.maps
+    const myPosition = new kakaoMaps.LatLng(mine.latitude, mine.longitude)
+    const partnerPosition = new kakaoMaps.LatLng(partner.latitude, partner.longitude)
+    locationMap = new kakaoMaps.Map(mapContainer, {
+      center: myPosition,
+      level: 5,
+    })
+
+    const positionsOverlap = Math.abs(mine.latitude - partner.latitude) < 0.000001
+      && Math.abs(mine.longitude - partner.longitude) < 0.000001
+    addLocationMarker(
+      locationMap,
+      myPosition,
+      '나',
+      `is-mine ${positionsOverlap ? 'is-overlap-left' : ''}`.trim(),
+    )
+    addLocationMarker(
+      locationMap,
+      partnerPosition,
+      partnerNickname,
+      `is-partner ${positionsOverlap ? 'is-overlap-right' : ''}`.trim(),
+    )
+
+    if (positionsOverlap) {
+      locationMap.setCenter(myPosition)
+      locationMap.setLevel(4)
+    } else {
+      const bounds = new kakaoMaps.LatLngBounds()
+      bounds.extend(myPosition)
+      bounds.extend(partnerPosition)
+      locationMap.setBounds(bounds, 70, 70, 70, 70)
+    }
+    locationMap.relayout()
+    hideMapStatus()
+    searchNearbyRestaurants(mine, partner)
+  }
+
+  function addLocationMarker(map, position, label, modifier) {
+    const marker = document.createElement('div')
+    marker.className = `chat-map-marker ${modifier}`
+    const pin = document.createElement('span')
+    pin.className = 'chat-map-marker-pin'
+    pin.setAttribute('aria-hidden', 'true')
+    const copy = document.createElement('span')
+    copy.className = 'chat-map-marker-label'
+    copy.textContent = label
+    marker.append(pin, copy)
+
+    new window.kakao.maps.CustomOverlay({
+      map,
+      position,
+      content: marker,
+      xAnchor: 0.5,
+      yAnchor: 1,
+      zIndex: modifier === 'is-mine' ? 3 : 2,
+    })
+  }
+
+  async function searchNearbyRestaurants(mine, partner) {
+    const mineCategory = FOOD_CATEGORY_DETAILS[mine.foodCategory]
+    const partnerCategory = FOOD_CATEGORY_DETAILS[partner.foodCategory]
+    if (!mineCategory || !partnerCategory || !window.kakao?.maps?.services?.Places) {
+      showRestaurantStatus('주변 식당 후보를 불러올 수 없어요.', true)
+      return
+    }
+
+    setText('chat-my-food-label', `내 메뉴 · ${mineCategory.label}`)
+    setText('chat-partner-food-label', `${partnerNickname}님 메뉴 · ${partnerCategory.label}`)
+    document.getElementById('chat-restaurant-legend')?.classList.remove('is-hidden')
+    showRestaurantStatus('중간 지점 주변 식당을 찾고 있어요.')
+
+    const midpoint = {
+      latitude: (Number(mine.latitude) + Number(partner.latitude)) / 2,
+      longitude: (Number(mine.longitude) + Number(partner.longitude)) / 2,
+    }
+    const center = new window.kakao.maps.LatLng(midpoint.latitude, midpoint.longitude)
+    const searches = mine.foodCategory === partner.foodCategory
+      ? [{ ...mineCategory, owners: ['mine', 'partner'] }]
+      : [
+          { ...mineCategory, owners: ['mine'] },
+          { ...partnerCategory, owners: ['partner'] },
+        ]
+
+    try {
+      let appliedSearchRadius = PRIMARY_RESTAURANT_SEARCH_RADIUS_METERS
+      let results = await searchRestaurantCandidates(searches, center, appliedSearchRadius)
+      let mergedCandidates = mergePlaceCandidates(results.flat())
+
+      if (mergedCandidates.length < MIN_RESTAURANT_CANDIDATES_BEFORE_EXPANSION) {
+        appliedSearchRadius = EXPANDED_RESTAURANT_SEARCH_RADIUS_METERS
+        results = await searchRestaurantCandidates(searches, center, appliedSearchRadius)
+        mergedCandidates = mergePlaceCandidates(results.flat())
+      }
+
+      const candidates = rankPlaceCandidates(
+        mergedCandidates,
+        mine,
+        partner,
+        midpoint,
+        appliedSearchRadius,
+      ).slice(0, MAX_DISPLAYED_RESTAURANTS)
+      if (!candidates.length) {
+        showRestaurantStatus('반경 3km 안에서 식당 후보를 찾지 못했어요.', true)
+        return
+      }
+
+      const bounds = new window.kakao.maps.LatLngBounds()
+      bounds.extend(new window.kakao.maps.LatLng(mine.latitude, mine.longitude))
+      bounds.extend(new window.kakao.maps.LatLng(partner.latitude, partner.longitude))
+      candidates.forEach(candidate => {
+        const position = new window.kakao.maps.LatLng(candidate.place.y, candidate.place.x)
+        bounds.extend(position)
+        addRestaurantMarker(candidate, position)
+      })
+      locationMap.setBounds(bounds, 80, 80, 80, 80)
+      showRestaurantStatus(
+        `중간 지점 반경 ${formatSearchRadius(appliedSearchRadius)} · 식당 후보 ${candidates.length}곳`,
+      )
+    } catch {
+      showRestaurantStatus('주변 식당 후보를 불러오지 못했어요.', true)
+    }
+  }
+
+  function searchRestaurantCandidates(searches, center, searchRadius) {
+    return Promise.all(
+      searches.map(search => searchCategoryPlaces(search, center, searchRadius)
+        .then(places => places.map(place => ({ place, owners: search.owners })))),
+    )
+  }
+
+  function searchCategoryPlaces(category, location, searchRadius) {
+    return new Promise((resolve, reject) => {
+      const places = new window.kakao.maps.services.Places()
+      const matchedPlaces = []
+      const seenPlaceIds = new Set()
+      let searchedPageCount = 0
+
+      const handleResult = (result, status, pagination) => {
+        if (status === window.kakao.maps.services.Status.OK) {
+          searchedPageCount += 1
+          result.forEach(place => {
+            const placeKey = place.id || `${place.x}:${place.y}:${place.place_name}`
+            if (seenPlaceIds.has(placeKey)
+                || !matchesFoodCategory(place, category)
+                || !hasSufficientPlaceInformation(place)) return
+            seenPlaceIds.add(placeKey)
+            matchedPlaces.push(place)
+          })
+
+          if (searchedPageCount >= MAX_RESTAURANT_SEARCH_PAGES
+              || !pagination?.hasNextPage) {
+            resolve(matchedPlaces)
+            return
+          }
+          pagination.nextPage()
+          return
+        }
+        if (status === window.kakao.maps.services.Status.ZERO_RESULT) {
+          resolve(matchedPlaces)
+          return
+        }
+        reject(new Error('장소 검색에 실패했습니다.'))
+      }
+
+      places.categorySearch(category.groupCode, handleResult, {
+        location,
+        radius: searchRadius,
+        size: 15,
+        sort: window.kakao.maps.services.SortBy.ACCURACY,
+      })
+    })
+  }
+
+  function matchesFoodCategory(place, category) {
+    if (!category.categoryKeywords.length) return true
+    const categoryName = String(place.category_name || '').replaceAll(' ', '')
+    return category.categoryKeywords.some(keyword => categoryName.includes(keyword))
+  }
+
+  function hasSufficientPlaceInformation(place) {
+    const availableFieldCount = [place.road_address_name, place.phone, place.place_url]
+      .filter(value => String(value || '').trim()).length
+    return availableFieldCount >= 2
+  }
+
+  function rankPlaceCandidates(candidates, mine, partner, midpoint, searchRadius) {
+    const distanceBetweenUsers = distanceMeters(mine, partner)
+    return candidates
+      .map(candidate => {
+        const placeLocation = {
+          latitude: Number(candidate.place.y),
+          longitude: Number(candidate.place.x),
+        }
+        const midpointDistance = distanceMeters(placeLocation, midpoint)
+        const mineDistance = distanceMeters(placeLocation, mine)
+        const partnerDistance = distanceMeters(placeLocation, partner)
+        const distanceBalanceDifference = Math.abs(mineDistance - partnerDistance)
+        const informationFieldCount = [
+          candidate.place.road_address_name,
+          candidate.place.phone,
+          candidate.place.place_url,
+        ].filter(value => String(value || '').trim()).length
+
+        const categoryScore = 40
+        const midpointScore = Math.max(
+          0,
+          1 - midpointDistance / searchRadius,
+        ) * 30
+        const balanceScore = Math.max(
+          0,
+          1 - distanceBalanceDifference / Math.max(distanceBetweenUsers, searchRadius),
+        ) * 20
+        const informationScore = (informationFieldCount / 3) * 10
+
+        return {
+          ...candidate,
+          rankingScore: categoryScore + midpointScore + balanceScore + informationScore,
+          midpointDistance,
+        }
+      })
+      .sort((first, second) => second.rankingScore - first.rankingScore
+        || first.midpointDistance - second.midpointDistance
+        || String(first.place.id || '').localeCompare(String(second.place.id || '')))
+  }
+
+  function formatSearchRadius(searchRadius) {
+    return `${searchRadius / 1000}km`
+  }
+
+  function distanceMeters(first, second) {
+    const earthRadiusMeters = 6371000
+    const toRadians = degrees => degrees * Math.PI / 180
+    const firstLatitude = toRadians(Number(first.latitude))
+    const secondLatitude = toRadians(Number(second.latitude))
+    const latitudeDifference = secondLatitude - firstLatitude
+    const longitudeDifference = toRadians(Number(second.longitude) - Number(first.longitude))
+    const haversine = Math.sin(latitudeDifference / 2) ** 2
+      + Math.cos(firstLatitude) * Math.cos(secondLatitude)
+      * Math.sin(longitudeDifference / 2) ** 2
+    const clampedHaversine = Math.min(1, Math.max(0, haversine))
+    return earthRadiusMeters * 2
+      * Math.atan2(Math.sqrt(clampedHaversine), Math.sqrt(1 - clampedHaversine))
+  }
+
+  function mergePlaceCandidates(entries) {
+    const placesById = new Map()
+    entries.forEach(({ place, owners }) => {
+      const key = place.id || `${place.x}:${place.y}:${place.place_name}`
+      const existing = placesById.get(key)
+      if (existing) {
+        owners.forEach(owner => existing.owners.add(owner))
+        return
+      }
+      placesById.set(key, { place, owners: new Set(owners) })
+    })
+    return Array.from(placesById.values())
+  }
+
+  function addRestaurantMarker(candidate, position) {
+    const ownership = candidate.owners.size > 1
+      ? 'is-shared'
+      : candidate.owners.has('mine') ? 'is-mine' : 'is-partner'
+    const marker = document.createElement('button')
+    marker.type = 'button'
+    marker.className = `chat-restaurant-marker ${ownership}`
+    marker.setAttribute('aria-label', `${candidate.place.place_name} 상세 보기`)
+    marker.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">restaurant</span>'
+
+    new window.kakao.maps.CustomOverlay({
+      map: locationMap,
+      position,
+      content: marker,
+      xAnchor: 0.5,
+      yAnchor: 0.5,
+      zIndex: 1,
+    })
+
+    marker.addEventListener('click', () => showPlaceOverlay(candidate, position))
+  }
+
+  function showPlaceOverlay(candidate, position) {
+    if (activePlaceOverlay) activePlaceOverlay.setMap(null)
+
+    const content = document.createElement('article')
+    content.className = 'chat-place-popover'
+    const name = document.createElement('strong')
+    name.textContent = candidate.place.place_name
+    const category = document.createElement('span')
+    category.textContent = candidate.place.category_name || '음식점'
+    const address = document.createElement('p')
+    address.textContent = candidate.place.road_address_name || candidate.place.address_name || '주소 정보 없음'
+    content.append(name, category, address)
+    const actions = document.createElement('div')
+    actions.className = 'chat-place-popover-actions'
+    const shareButton = document.createElement('button')
+    shareButton.type = 'button'
+    shareButton.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">maps_ugc</span> 채팅에 공유'
+    shareButton.addEventListener('click', () => sendPlaceMessage(candidate))
+    actions.append(shareButton)
+    if (candidate.place.place_url) {
+      const link = document.createElement('a')
+      link.href = candidate.place.place_url
+      link.target = '_blank'
+      link.rel = 'noopener noreferrer'
+      link.textContent = '카카오맵에서 보기'
+      actions.append(link)
+    }
+    content.append(actions)
+
+    activePlaceOverlay = new window.kakao.maps.CustomOverlay({
+      map: locationMap,
+      position,
+      content,
+      xAnchor: 0.5,
+      yAnchor: 1.25,
+      zIndex: 10,
+    })
+  }
+
+  function focusSharedPlaceOnMap(place) {
+    if (!locationMap || !isValidSharedPlace(place)) return
+    const position = new window.kakao.maps.LatLng(place.latitude, place.longitude)
+    locationMap.panTo(position)
+    showPlaceOverlay({
+      place: {
+        id: place.providerPlaceId,
+        place_name: place.name,
+        category_name: place.category,
+        road_address_name: place.address,
+        x: String(place.longitude),
+        y: String(place.latitude),
+        place_url: getSafePlaceUrl(place),
+      },
+      owners: new Set(),
+    }, position)
+  }
+
+  function isValidSharedPlace(place) {
+    return place
+      && /^\d{1,30}$/.test(String(place.providerPlaceId || ''))
+      && Boolean(String(place.name || '').trim())
+      && Number.isFinite(Number(place.latitude))
+      && Number.isFinite(Number(place.longitude))
+  }
+
+  function getSafePlaceUrl(place) {
+    const providerPlaceId = String(place?.providerPlaceId || '')
+    if (!/^\d{1,30}$/.test(providerPlaceId)) return null
+    return `https://place.map.kakao.com/${providerPlaceId}`
+  }
+
+  function showRestaurantStatus(message, isError = false) {
+    const status = document.getElementById('chat-restaurant-status')
+    if (!status) return
+    status.textContent = message
+    status.classList.remove('is-hidden', 'is-error')
+    if (isError) status.classList.add('is-error')
+  }
+
+  function isValidLocation(location) {
+    return location
+      && Number.isFinite(Number(location.latitude))
+      && Number.isFinite(Number(location.longitude))
+      && Math.abs(Number(location.latitude)) <= 90
+      && Math.abs(Number(location.longitude)) <= 180
+  }
+
+  function setText(id, text) {
+    const element = document.getElementById(id)
+    if (element) element.textContent = text || ''
+  }
+
+  function showMapStatus(message, icon) {
+    const status = document.getElementById('chat-map-status')
+    if (!status) return
+    status.classList.remove('is-hidden')
+    const iconElement = status.querySelector('.material-symbols-outlined')
+    const messageElement = status.querySelector('span:last-child')
+    if (iconElement) iconElement.textContent = icon
+    if (messageElement) messageElement.textContent = message
+  }
+
+  function hideMapStatus() {
+    document.getElementById('chat-map-status')?.classList.add('is-hidden')
   }
 
   // ── 이벤트 바인딩 ──────────────────────────────────────────────────────────
@@ -302,6 +962,8 @@ export function renderChatPage(container) {
       partnerNickname = matchResult.partner.nickname || '상대방'
       partnerUserId = matchResult.partner.userId
       partnerProfileImg = matchResult.partner.profileImageUrl
+      updatePartnerHeader()
+      renderDesiredLocations(matchResult.desiredLocations)
     }
 
     // 정보를 다 확보한 상태에서 자동으로 입장 처리 진행
