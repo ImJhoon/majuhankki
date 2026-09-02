@@ -18,6 +18,7 @@
 - [핵심 기능](#핵심-기능)
 - [서비스 이용 흐름](#서비스-이용-흐름)
 - [시스템 아키텍처](#시스템-아키텍처)
+- [ERD](#erd)
 - [기술 스택](#기술-스택)
 - [핵심 설계와 문제 해결](#핵심-설계와-문제-해결)
 - [프로젝트 구조](#프로젝트-구조)
@@ -106,42 +107,15 @@ flowchart LR
 
 ## 시스템 아키텍처
 
-```mermaid
-flowchart TB
-    User[사용자 브라우저]
+<p align="center">
+  <img src="docs/assets/image/시스템아키텍쳐.jpg" alt="시스템 아키텍처" width="600">
+</p>
 
-    subgraph Frontend[Frontend]
-        CF[Cloudflare Pages\nVite + Vanilla JavaScript]
-    end
+## ERD
 
-    subgraph Backend[Backend]
-        Render[Render\nJava 17 + Spring Boot]
-        WS[WebSocket + STOMP]
-    end
-
-    subgraph Data[Data & State]
-        DB[(Supabase PostgreSQL\nPostGIS + pgvector)]
-        Storage[(Supabase Storage)]
-        Valkey[(Aiven for Valkey)]
-    end
-
-    subgraph External[External APIs]
-        Kakao[Kakao OAuth / Kakao Maps]
-        GoogleOAuth[Google OAuth]
-        Gemini[Google GenAI]
-    end
-
-    User --> CF
-    CF -->|REST / OAuth| Render
-    CF <-->|SockJS / STOMP| WS
-    WS --- Render
-    Render --> DB
-    Render --> Storage
-    Render --> Valkey
-    Render --> Kakao
-    Render --> GoogleOAuth
-    Render -. 선택 기능 .-> Gemini
-```
+<p align="center">
+  <img src="docs/assets/image/erd.png" alt="ERD" width="600">
+</p>
 
 ## 기술 스택
 
