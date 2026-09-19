@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="마주한끼 핵심 흐름을 살펴보는 체험용 데모" />
+    <meta name="theme-color" content="#faf7f2" />
+    <title>마주한끼 | 체험용 데모</title>
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block" />
+    <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: '#ae3115',
+              'primary-container': '#ff6b4a',
+              secondary: '#505e7f',
+              'brand-navy': '#1e2c4a',
+              'brand-ivory': '#faf7f2',
+              'surface-container-lowest': '#ffffff',
+              'surface-container-low': '#eff4ff',
+              'surface-container': '#e5eeff',
+              'surface-dim': '#cbdbf5',
+              'outline-variant': '#e1bfb8',
+              success: '#82a67d',
+              error: '#ba1a1a',
+            },
+            borderRadius: { card: '24px' },
+            spacing: { 'margin-mobile': '20px', 'margin-desktop': '40px' },
+            fontFamily: {
+              headline: ['GyeonggiMillenniumTitle', 'Pretendard', 'sans-serif'],
+              body: ['Be Vietnam Pro', 'Pretendard', 'sans-serif'],
+            },
+            boxShadow: {
+              soft: '0 16px 40px rgba(30, 44, 74, 0.06)',
+              floating: '0 24px 60px rgba(30, 44, 74, 0.12)',
+              'glow-primary': '0 8px 24px rgba(255, 107, 74, 0.30)',
+            },
+          },
+        },
+      }
+    </script>
+  </head>
+  <body class="font-body min-h-screen flex flex-col bg-brand-ivory pt-[88px] text-brand-navy antialiased">
+    <a class="skip-link" href="#demo-main">본문으로 건너뛰기</a>
+    <div id="demo-app" class="flex-grow flex flex-col" aria-live="polite">
+      <noscript>이 데모는 JavaScript가 필요합니다. 브라우저에서 JavaScript를 활성화해 주세요.</noscript>
+    </div>
+    <script type="module" src="/src/demo/main.js"></script>
+  </body>
+</html>

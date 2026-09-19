@@ -1,0 +1,39 @@
+name: project2-loadtest
+
+services:
+  postgres:
+    build: ./postgres
+    image: project2-loadtest-postgres:pg17-vector0.8.2
+    environment:
+      POSTGRES_DB: project2_loadtest
+      POSTGRES_USER: loadtest_admin
+      POSTGRES_PASSWORD: ${LOADTEST_POSTGRES_PASSWORD:?테스트 DB 관리자 비밀번호가 필요합니다}
+      LOADTEST_DB_PASSWORD: ${LOADTEST_DB_PASSWORD:?테스트 DB 앱 비밀번호가 필요합니다}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loadtest_admin -d project2_loadtest"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4.2-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6380:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:

@@ -1,5 +1,6 @@
 package org.example.project2.domain.personality.service;
 
+import jakarta.persistence.EntityManager;
 import org.example.project2.domain.personality.dto.FoodPreferencesUpdateRequest;
 import org.example.project2.domain.personality.dto.PersonalityAnswerRequest;
 import org.example.project2.domain.personality.dto.PersonalityProfileResponse;
@@ -63,6 +64,9 @@ class PersonalityServiceTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private EntityManager entityManager;
+
     private PersonalityService service;
 
     @BeforeEach
@@ -75,7 +79,8 @@ class PersonalityServiceTest {
                 new PersonalityScoreCalculator(),
                 aiClient,
                 eventPublisher,
-                Clock.fixed(NOW, ZoneOffset.UTC)
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                entityManager
         );
     }
 
@@ -136,7 +141,8 @@ class PersonalityServiceTest {
         assertThat(response.scores().conversationLevel()).isZero();
         assertThat(response.scores().mealPace()).isEqualTo((short) 50);
         assertThat(response.scores().planningStyle()).isEqualTo((short) 100);
-        assertThat(response.styleTags()).containsExactly(PersonalityTag.GOOD_LISTENER);
+        assertThat(response.styleTags()).containsExactlyInAnyOrder(
+                PersonalityTag.GOOD_LISTENER, PersonalityTag.FOOD_TALK, PersonalityTag.ENJOY_DESSERT);
         verify(answerRepository).deleteAllByUserId(user.getId());
         verify(answerRepository).saveAll(org.mockito.ArgumentMatchers.argThat(savedAnswers -> {
             Map<PersonalityDimension, Short> values = StreamSupport.stream(savedAnswers.spliterator(), false)
@@ -151,7 +157,7 @@ class PersonalityServiceTest {
                     PersonalityDimension.NOVELTY_PREFERENCE, (short) 3
             ));
         }));
-        verify(embeddingRepository).deleteById(user.getId());
+        verify(embeddingRepository).deleteAllByProfileUserId(user.getId());
     }
 
     @Test
@@ -171,7 +177,7 @@ class PersonalityServiceTest {
         assertThat(response.selfDescription()).isEqualTo("조용한 식사를 좋아해요.");
         assertThat(response.aiAnalysisConsent()).isTrue();
         var embeddingOrder = inOrder(embeddingRepository, eventPublisher);
-        embeddingOrder.verify(embeddingRepository).deleteById(user.getId());
+        embeddingOrder.verify(embeddingRepository).deleteAllByProfileUserId(user.getId());
         embeddingOrder.verify(eventPublisher).publishEvent(new PersonalityEmbeddingRequestedEvent(
                 user.getId(), "조용한 식사를 좋아해요."
         ));
@@ -194,7 +200,7 @@ class PersonalityServiceTest {
 
         assertThat(response.selfDescription()).isNull();
         assertThat(response.aiAnalysisConsent()).isFalse();
-        verify(embeddingRepository).deleteById(user.getId());
+        verify(embeddingRepository).deleteAllByProfileUserId(user.getId());
         verifyNoInteractions(aiClient);
     }
 
@@ -245,8 +251,8 @@ class PersonalityServiceTest {
         assertThat(response.scores().mealPace()).isEqualTo((short) 100);
         assertThat(response.scores().planningStyle()).isEqualTo((short) 100);
         assertThat(response.scores().noveltyPreference()).isEqualTo((short) 100);
-        assertThat(response.styleTags()).containsExactly(PersonalityTag.FOOD_TALK);
-        assertThat(profile.getStyleTags()).containsExactly(PersonalityTag.FOOD_TALK);
+        assertThat(response.styleTags()).containsExactlyInAnyOrderElementsOf(replacement.styleTags());
+        assertThat(profile.getStyleTags()).containsExactlyInAnyOrderElementsOf(replacement.styleTags());
         verify(answerRepository).deleteAllByUserId(user.getId());
         verify(answerRepository).saveAll(anyList());
     }
@@ -301,7 +307,7 @@ class PersonalityServiceTest {
 
         var deletionOrder = inOrder(answerRepository, embeddingRepository, profileRepository);
         deletionOrder.verify(answerRepository).deleteAllByUserId(user.getId());
-        deletionOrder.verify(embeddingRepository).deleteById(user.getId());
+        deletionOrder.verify(embeddingRepository).deleteAllByProfileUserId(user.getId());
         deletionOrder.verify(profileRepository).delete(profile);
         assertThat(user.getPersonalityOnboardingStatus()).isEqualTo(PersonalityOnboardingStatus.NOT_STARTED);
     }

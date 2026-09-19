@@ -29,6 +29,35 @@ class PersonalityProfileUpsertRequestTest {
     }
 
     @Test
+    void acceptsConsentWithdrawalAndDiscardsSubmittedAiData() {
+        PersonalityProfileUpsertRequest baseline = request(List.of(
+                answer(PersonalityDimension.CONVERSATION_LEVEL, PersonalityAnswerValue.LOW),
+                answer(PersonalityDimension.MEAL_PACE, PersonalityAnswerValue.MEDIUM),
+                answer(PersonalityDimension.PLANNING_STYLE, PersonalityAnswerValue.HIGH),
+                answer(PersonalityDimension.NOVELTY_PREFERENCE, PersonalityAnswerValue.MEDIUM)
+        ));
+        PersonalityProfileUpsertRequest withdrawn = new PersonalityProfileUpsertRequest(
+                baseline.questionnaireVersion(), baseline.answers(), baseline.styleTags(),
+                "이전 자기소개", false, List.of("이전 키워드")
+        );
+
+        assertThat(withdrawn.validatedAnswers()).hasSize(4);
+        assertThat(withdrawn.selfDescription()).isNull();
+        assertThat(withdrawn.aiKeywords()).isEmpty();
+        try (var factory = jakarta.validation.Validation.buildDefaultValidatorFactory()) {
+            assertThat(factory.getValidator().validate(withdrawn)).isEmpty();
+        }
+
+        PersonalityProfileUpsertRequest consentedWithoutKeywords = new PersonalityProfileUpsertRequest(
+                baseline.questionnaireVersion(), baseline.answers(), baseline.styleTags(),
+                "자기소개", true, List.of()
+        );
+        assertThatThrownBy(consentedWithoutKeywords::validatedAnswers)
+                .isInstanceOf(InvalidPersonalityInputException.class)
+                .hasMessage("AI 키워드 태그를 최소 1개 이상 추출해야 합니다.");
+    }
+
+    @Test
     void rejectsDuplicatedAndMissingDimension() {
         PersonalityProfileUpsertRequest request = request(List.of(
                 answer(PersonalityDimension.CONVERSATION_LEVEL, PersonalityAnswerValue.LOW),

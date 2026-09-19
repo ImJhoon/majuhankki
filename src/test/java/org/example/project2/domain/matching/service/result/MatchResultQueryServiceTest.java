@@ -46,6 +46,8 @@ class MatchResultQueryServiceTest {
         ChatRoom chatRoom = mock(ChatRoom.class);
         MatchResultResponse expected = mock(MatchResultResponse.class);
         MatchResultResponse other = mock(MatchResultResponse.class);
+        when(match.getStatus()).thenReturn(org.example.project2.domain.matching.entity.MatchStatus.MATCHED);
+        when(chatRoom.isActive()).thenReturn(true);
         when(match.getId()).thenReturn(10L);
         when(match.getRequest1()).thenReturn(request1);
         when(match.getRequest2()).thenReturn(request2);

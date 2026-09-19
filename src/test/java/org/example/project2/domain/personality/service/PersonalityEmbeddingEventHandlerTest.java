@@ -15,9 +15,11 @@ import org.example.project2.domain.user.entity.User;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -43,7 +45,6 @@ class PersonalityEmbeddingEventHandlerTest {
         when(profileRepository.findByUserId(userId)).thenReturn(Optional.of(profile));
         when(aiClient.embed(any())).thenReturn(Optional.of(new float[1536]));
         when(aiClient.embeddingModelName()).thenReturn("gemini-embedding-001");
-        when(embeddingRepository.findById(userId)).thenReturn(Optional.empty());
         PersonalityEmbeddingEventHandler handler = new PersonalityEmbeddingEventHandler(
                 profileRepository, embeddingRepository, new PersonalityTextEmbeddingDocumentBuilder(), aiClient
         );
@@ -51,7 +52,48 @@ class PersonalityEmbeddingEventHandlerTest {
         handler.generate(new PersonalityEmbeddingRequestedEvent(userId, profile.getSelfDescription()));
 
         verify(aiClient).embed("새로운 맛집을 좋아해요.");
-        verify(embeddingRepository).save(any(UserPersonalityEmbedding.class));
+        ArgumentCaptor<List<UserPersonalityEmbedding>> captor = ArgumentCaptor.forClass(List.class);
+        verify(embeddingRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).singleElement().satisfies(embedding -> {
+            assertThat(embedding.getProfile()).isSameAs(profile);
+            assertThat(embedding.getSourceText()).isEqualTo(profile.getSelfDescription());
+            assertThat(embedding.getEmbedding()).hasSize(1536);
+            assertThat(embedding.getModelName()).isEqualTo("gemini-embedding-001");
+            assertThat(embedding.getSourceVersion()).isEqualTo(PersonalityTextEmbeddingDocumentBuilder.DOCUMENT_VERSION);
+            assertThat(embedding.getGeneratedAt()).isNotNull();
+        });
+    }
+
+    @Test
+    void savesOneEmbeddingPerExtractedKeywordAndPreservesStyleTags() {
+        UUID userId = UUID.randomUUID();
+        UserPersonalityProfile profile = profile(userId, true, "대화와 맛집을 좋아해요.");
+        when(profileRepository.findByUserId(userId)).thenReturn(Optional.of(profile));
+        when(aiClient.extractKeywords(profile.getSelfDescription()))
+                .thenReturn(Optional.of(List.of("대화", "맛집")));
+        float[] conversationVector = new float[1536];
+        conversationVector[0] = 1;
+        float[] restaurantVector = new float[1536];
+        restaurantVector[1] = 1;
+        when(aiClient.embed("대화")).thenReturn(Optional.of(conversationVector));
+        when(aiClient.embed("맛집")).thenReturn(Optional.of(restaurantVector));
+        when(aiClient.embeddingModelName()).thenReturn("test-model");
+        PersonalityEmbeddingEventHandler handler = new PersonalityEmbeddingEventHandler(
+                profileRepository, embeddingRepository, new PersonalityTextEmbeddingDocumentBuilder(), aiClient
+        );
+
+        handler.generate(new PersonalityEmbeddingRequestedEvent(userId, profile.getSelfDescription()));
+
+        ArgumentCaptor<List<UserPersonalityEmbedding>> captor = ArgumentCaptor.forClass(List.class);
+        verify(embeddingRepository).deleteAllByProfileUserId(userId);
+        verify(embeddingRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).extracting(UserPersonalityEmbedding::getSourceText)
+                .containsExactly("대화", "맛집");
+        assertThat(captor.getValue().get(0).getEmbedding()).containsExactly(conversationVector);
+        assertThat(captor.getValue().get(1).getEmbedding()).containsExactly(restaurantVector);
+        assertThat(profile.getAiKeywords()).containsExactlyInAnyOrder("대화", "맛집");
+        assertThat(profile.getStyleTags()).containsExactly(PersonalityTag.GOOD_LISTENER);
+        verify(aiClient, never()).embed(profile.getSelfDescription());
     }
 
     @Test
@@ -66,7 +108,7 @@ class PersonalityEmbeddingEventHandlerTest {
 
         handler.generate(new PersonalityEmbeddingRequestedEvent(userId, "소개"));
 
-        verify(embeddingRepository, never()).save(any());
+        verify(embeddingRepository, never()).saveAll(any());
     }
 
     @Test
@@ -81,8 +123,8 @@ class PersonalityEmbeddingEventHandlerTest {
         handler.generate(new PersonalityEmbeddingRequestedEvent(userId, "이전 소개"));
 
         verifyNoInteractions(aiClient);
-        verify(embeddingRepository, never()).save(any());
-        verify(embeddingRepository, never()).deleteById(userId);
+        verify(embeddingRepository, never()).saveAll(any());
+        verify(embeddingRepository, never()).deleteAllByProfileUserId(userId);
     }
 
     @Test
@@ -92,14 +134,14 @@ class PersonalityEmbeddingEventHandlerTest {
         UserPersonalityProfile latestProfile = profile(userId, true, "새로운 소개");
         when(profileRepository.findByUserId(userId))
                 .thenReturn(Optional.of(oldProfile), Optional.of(latestProfile));
-        when(aiClient.embed("이전 소개")).thenReturn(Optional.of(new float[1536]));
+        when(aiClient.extractKeywords("이전 소개")).thenReturn(Optional.of(List.of("대화")));
         PersonalityEmbeddingEventHandler handler = new PersonalityEmbeddingEventHandler(
                 profileRepository, embeddingRepository, new PersonalityTextEmbeddingDocumentBuilder(), aiClient
         );
 
         handler.generate(new PersonalityEmbeddingRequestedEvent(userId, "이전 소개"));
 
-        verify(embeddingRepository, never()).save(any());
+        verify(embeddingRepository, never()).saveAll(any());
     }
 
     @Test
@@ -113,7 +155,7 @@ class PersonalityEmbeddingEventHandlerTest {
 
         handler.generate(new PersonalityEmbeddingRequestedEvent(userId, "이전 소개"));
 
-        verify(embeddingRepository).deleteById(userId);
+        verify(embeddingRepository).deleteAllByProfileUserId(userId);
         verifyNoInteractions(aiClient);
     }
 
@@ -128,12 +170,12 @@ class PersonalityEmbeddingEventHandlerTest {
 
         handler.generate(new PersonalityEmbeddingRequestedEvent(userId, "기존 소개"));
 
-        verify(embeddingRepository).deleteById(userId);
+        verify(embeddingRepository).deleteAllByProfileUserId(userId);
         verifyNoInteractions(aiClient);
     }
 
     @Test
-    void ignoresInvalidDimensionFromAiWithoutReplacingExistingEmbedding() {
+    void doesNotSaveInvalidDimensionFromAi() {
         UUID userId = UUID.randomUUID();
         UserPersonalityProfile profile = profile(userId, true, "소개");
         when(profileRepository.findByUserId(userId)).thenReturn(Optional.of(profile));
@@ -144,7 +186,7 @@ class PersonalityEmbeddingEventHandlerTest {
 
         handler.generate(new PersonalityEmbeddingRequestedEvent(userId, "소개"));
 
-        verify(embeddingRepository, never()).save(any());
+        verify(embeddingRepository, never()).saveAll(any());
     }
 
     @Test

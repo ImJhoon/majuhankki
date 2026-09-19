@@ -32,6 +32,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -183,6 +184,23 @@ class RealtimeMatchRequestServiceTest {
         assertThat(locationPreferenceRepository.findById(user.getId()).orElseThrow().getRegionCode())
                 .isEqualTo(REGION_CODE);
         verify(regionPinValidator).validate(DIFFERENT_REGION_CODE, 127.1238, 37.5301);
+    }
+
+    @Test
+    void allowsTagBasedMatchingAfterAiConsentWithdrawal() {
+        var profile = personalityProfileRepository.findByUserId(user.getId()).orElseThrow();
+        profile.replace(profile.getQuestionnaireVersion(), profile.getConversationLevel(),
+                profile.getMealPace(), profile.getPlanningStyle(), profile.getNoveltyPreference(),
+                new java.util.HashSet<>(profile.getStyleTags()), null, false,
+                profile.getCompletedAt(), List.of());
+        personalityProfileRepository.saveAndFlush(profile);
+
+        var response = service.create(user.getId(), validRequest("편안한 대화"));
+
+        assertThat(response.status()).isEqualTo(MatchRequestStatus.WAITING);
+        assertThat(personalityProfileRepository.findByUserId(user.getId()).orElseThrow().getAiKeywords())
+                .isEmpty();
+        verify(aiClient, timeout(5_000)).embed("편안한 대화");
     }
 
     @Test

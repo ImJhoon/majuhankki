@@ -65,7 +65,7 @@ class MatchProposalSelectionServiceTest {
         MatchRequest source = request(1L, user("source"));
         MatchRequest candidate = request(2L, user("candidate"));
         prepareCandidate(source, candidate);
-        when(personalityCompatibilityCalculator.calculate(any(), any(), any(), any()))
+        when(personalityCompatibilityCalculator.calculateWithList(any(), any(), any(), any()))
                 .thenReturn(score((short) 82), score((short) 68));
         when(matchProposalRepository.save(any(MatchProposal.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -83,7 +83,7 @@ class MatchProposalSelectionServiceTest {
         verify(redisLifecycleService).suspendWaitingForProposalAfterCommit(proposal);
         verify(redisLifecycleService).putProposalAfterCommit(proposal);
         verify(personalityCompatibilityCalculator, times(2))
-                .calculate(any(), any(), any(), any());
+                .calculateWithList(any(), any(), any(), any());
     }
 
     @Test
@@ -131,9 +131,9 @@ class MatchProposalSelectionServiceTest {
         prepareCandidate(source, candidate);
         when(personalityProfileRepository.findAllByUserIdIn(anyList()))
                 .thenReturn(List.of(sourceProfile, candidateProfile));
-        when(personalityEmbeddingRepository.findAllByUserIdIn(anyList()))
+        when(personalityEmbeddingRepository.findAllByProfileUserIdIn(anyList()))
                 .thenReturn(List.of(sourceEmbedding, candidateEmbedding));
-        when(personalityCompatibilityCalculator.calculate(any(), any(), any(), any()))
+        when(personalityCompatibilityCalculator.calculateWithList(any(), any(), any(), any()))
                 .thenReturn(score((short) 82), score((short) 68));
         when(matchProposalRepository.save(any(MatchProposal.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -142,32 +142,32 @@ class MatchProposalSelectionServiceTest {
 
         ArgumentCaptor<PersonalityEmbeddingVector> desiredVectorCaptor =
                 ArgumentCaptor.forClass(PersonalityEmbeddingVector.class);
-        ArgumentCaptor<PersonalityEmbeddingVector> candidateVectorCaptor =
-                ArgumentCaptor.forClass(PersonalityEmbeddingVector.class);
-        verify(personalityCompatibilityCalculator, times(2)).calculate(
+        ArgumentCaptor<List<PersonalityEmbeddingVector>> candidateVectorCaptor =
+                ArgumentCaptor.forClass(List.class);
+        verify(personalityCompatibilityCalculator, times(2)).calculateWithList(
                 any(), any(), desiredVectorCaptor.capture(), candidateVectorCaptor.capture()
         );
 
         List<PersonalityEmbeddingVector> desiredVectors = desiredVectorCaptor.getAllValues();
-        List<PersonalityEmbeddingVector> candidateVectors = candidateVectorCaptor.getAllValues();
+        List<List<PersonalityEmbeddingVector>> candidateVectors = candidateVectorCaptor.getAllValues();
         assertThat(desiredVectors).hasSize(2);
         assertThat(candidateVectors).hasSize(2);
 
         assertThat(desiredVectors.get(0).values()).containsExactly(sourceDesiredValues);
         assertThat(desiredVectors.get(0).modelName()).isEqualTo("embedding-model");
         assertThat(desiredVectors.get(0).sourceVersion()).isEqualTo("PERSONALITY_FREE_TEXT_V2");
-        assertThat(candidateVectors.get(0).values())
+        assertThat(candidateVectors.get(0).get(0).values())
                 .containsExactly(candidateEmbedding.getEmbedding());
-        assertThat(candidateVectors.get(0).modelName()).isEqualTo("embedding-model");
-        assertThat(candidateVectors.get(0).sourceVersion()).isEqualTo("PERSONALITY_FREE_TEXT_V2");
+        assertThat(candidateVectors.get(0).get(0).modelName()).isEqualTo("embedding-model");
+        assertThat(candidateVectors.get(0).get(0).sourceVersion()).isEqualTo("PERSONALITY_FREE_TEXT_V2");
 
         assertThat(desiredVectors.get(1).values()).containsExactly(candidateDesiredValues);
-        assertThat(candidateVectors.get(1).values())
+        assertThat(candidateVectors.get(1).get(0).values())
                 .containsExactly(sourceEmbedding.getEmbedding());
         verify(matchRequestRepository, times(1)).findAllDetailedByIdIn(anyList());
         verify(matchRequestRepository, never()).findDetailedById(any());
         verify(personalityProfileRepository, times(1)).findAllByUserIdIn(anyList());
-        verify(personalityEmbeddingRepository, times(1)).findAllByUserIdIn(anyList());
+        verify(personalityEmbeddingRepository, times(1)).findAllByProfileUserIdIn(anyList());
         verify(personalityProfileRepository, never()).findByUserId(any());
         verify(personalityEmbeddingRepository, never()).findById(any());
     }
@@ -194,7 +194,7 @@ class MatchProposalSelectionServiceTest {
         prepareCandidate(source, candidate);
         when(personalityProfileRepository.findAllByUserIdIn(anyList()))
                 .thenReturn(List.of(sourceProfile, candidateProfile));
-        when(personalityCompatibilityCalculator.calculate(any(), any(), any(), any()))
+        when(personalityCompatibilityCalculator.calculateWithList(any(), any(), any(), any()))
                 .thenReturn(score(
                         (short) 82,
                         Set.of(
@@ -259,21 +259,21 @@ class MatchProposalSelectionServiceTest {
         );
         when(personalityProfileRepository.findAllByUserIdIn(anyList()))
                 .thenReturn(List.of(withdrawnProfile));
-        when(personalityEmbeddingRepository.findAllByUserIdIn(anyList()))
+        when(personalityEmbeddingRepository.findAllByProfileUserIdIn(anyList()))
                 .thenReturn(List.of(withdrawnEmbedding));
-        when(personalityCompatibilityCalculator.calculate(any(), any(), any(), any()))
+        when(personalityCompatibilityCalculator.calculateWithList(any(), any(), any(), any()))
                 .thenReturn(score((short) 82), score((short) 68));
         when(matchProposalRepository.save(any(MatchProposal.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         service.selectAndCreate(source.getUser().getId(), source.getId()).orElseThrow();
 
-        ArgumentCaptor<PersonalityEmbeddingVector> candidateVectorCaptor =
-                ArgumentCaptor.forClass(PersonalityEmbeddingVector.class);
-        verify(personalityCompatibilityCalculator, times(2)).calculate(
+        ArgumentCaptor<List<PersonalityEmbeddingVector>> candidateVectorCaptor =
+                ArgumentCaptor.forClass(List.class);
+        verify(personalityCompatibilityCalculator, times(2)).calculateWithList(
                 any(), any(), any(), candidateVectorCaptor.capture()
         );
-        assertThat(candidateVectorCaptor.getAllValues()).containsOnlyNulls();
+        assertThat(candidateVectorCaptor.getAllValues()).allSatisfy(vectors -> assertThat(vectors).isEmpty());
     }
 
     @Test
@@ -281,7 +281,7 @@ class MatchProposalSelectionServiceTest {
         MatchRequest source = request(1L, user("source"));
         MatchRequest candidate = request(2L, user("candidate"));
         prepareCandidate(source, candidate);
-        when(personalityCompatibilityCalculator.calculate(any(), any(), any(), any()))
+        when(personalityCompatibilityCalculator.calculateWithList(any(), any(), any(), any()))
                 .thenReturn(score((short) 82), score((short) 68));
         when(matchProposalRepository.save(any(MatchProposal.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -303,7 +303,7 @@ class MatchProposalSelectionServiceTest {
         MatchRequest source = request(1L, user("source"));
         MatchRequest candidate = request(2L, user("candidate"));
         prepareCandidate(source, candidate);
-        when(personalityCompatibilityCalculator.calculate(any(), any(), any(), any()))
+        when(personalityCompatibilityCalculator.calculateWithList(any(), any(), any(), any()))
                 .thenReturn(PersonalityCompatibilityScore.unavailable("DESIRED_PERSONALITY_MATCH_V1"));
         when(matchProposalRepository.save(any(MatchProposal.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -327,7 +327,7 @@ class MatchProposalSelectionServiceTest {
         assertThat(result).isEmpty();
         assertThat(source.getStatus()).isEqualTo(MatchRequestStatus.WAITING);
         verify(matchProposalRepository, never()).save(any());
-        verify(personalityCompatibilityCalculator, never()).calculate(any(), any(), any(), any());
+        verify(personalityCompatibilityCalculator, never()).calculateWithList(any(), any(), any(), any());
     }
 
     @Test
@@ -350,8 +350,8 @@ class MatchProposalSelectionServiceTest {
         when(matchRequestRepository.findAllDetailedByIdIn(anyList()))
                 .thenReturn(List.of(source, laterCandidate, earlierCandidate));
         when(personalityProfileRepository.findAllByUserIdIn(anyList())).thenReturn(List.of());
-        when(personalityEmbeddingRepository.findAllByUserIdIn(anyList())).thenReturn(List.of());
-        when(personalityCompatibilityCalculator.calculate(any(), any(), any(), any()))
+        when(personalityEmbeddingRepository.findAllByProfileUserIdIn(anyList())).thenReturn(List.of());
+        when(personalityCompatibilityCalculator.calculateWithList(any(), any(), any(), any()))
                 .thenReturn(score((short) 70), score((short) 70), score((short) 70), score((short) 70));
         when(matchRequestRepository.findAllByIdInForUpdate(List.of(source.getId(), earlierCandidate.getId())))
                 .thenReturn(List.of(source, earlierCandidate));
@@ -377,7 +377,7 @@ class MatchProposalSelectionServiceTest {
                 .thenReturn(List.of(source, candidate));
         when(candidateSearchService.isMutuallyEligible(source, candidate)).thenReturn(true);
         when(personalityProfileRepository.findAllByUserIdIn(anyList())).thenReturn(List.of());
-        when(personalityEmbeddingRepository.findAllByUserIdIn(anyList())).thenReturn(List.of());
+        when(personalityEmbeddingRepository.findAllByProfileUserIdIn(anyList())).thenReturn(List.of());
     }
 
     private PersonalityCompatibilityScore score(short value) {
@@ -450,7 +450,6 @@ class MatchProposalSelectionServiceTest {
             float[] embedding
     ) {
         return UserPersonalityEmbedding.builder()
-                .userId(userId)
                 .profile(profile)
                 .sourceText(sourceText)
                 .embedding(embedding)

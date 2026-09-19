@@ -77,14 +77,7 @@ public class MatchProposalSelectionService {
 
         List<ScoredCandidate> rankedCandidates = hardFilteredCandidates
                 .stream()
-                .filter(candidate -> {
-                    MatchRequest req = requestsById.get(candidate.requestId());
-                    if (req == null) return false;
-                    UserPersonalityProfile prof = profilesByUserId.get(req.getUser().getId());
-                    return prof != null
-                            && prof.getStyleTags() != null && !prof.getStyleTags().isEmpty()
-                            && prof.getAiKeywords() != null && !prof.getAiKeywords().isEmpty();
-                })
+                .filter(candidate -> requestsById.containsKey(candidate.requestId()))
                 .map(candidate -> assembleRankingInput(
                         source,
                         candidate,

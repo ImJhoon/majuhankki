@@ -348,12 +348,14 @@ select {
 
 /* Card Hover Elevation */
 .card-hover {
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
 }
 
 .card-hover:hover {
-  transform: translateY(-4px) scale(1.01);
-  box-shadow: 0 20px 48px rgba(30, 44, 74, 0.1);
+  transform: translateY(-8px);
+  box-shadow: 0 24px 52px rgba(30, 44, 74, 0.14);
 }
 
 /* Chip Badge */
@@ -684,13 +686,15 @@ select {
   .survey-dim-card,
   .survey-food-card,
   .survey-tag-badge,
-  .personality-survey-actions {
+  .personality-survey-actions,
+  .card-hover {
     transition: none;
   }
 
   .survey-dim-card:hover,
   .survey-food-card:hover,
-  .survey-tag-badge:hover {
+  .survey-tag-badge:hover,
+  .card-hover:hover {
     transform: none;
   }
 }

@@ -1,0 +1,93 @@
+# 로컬 부하 테스트 전용. dev/prod와 함께 활성화하지 않는다.
+server:
+  address: 127.0.0.1
+  port: 8081
+
+spring:
+  autoconfigure:
+    # Spring AI 2.0의 연결 자동 구성은 model=none만으로 해제되지 않는다.
+    exclude:
+      - org.springframework.ai.model.google.genai.autoconfigure.embedding.GoogleGenAiEmbeddingConnectionAutoConfiguration
+      - org.springframework.ai.model.google.genai.autoconfigure.embedding.GoogleGenAiTextEmbeddingAutoConfiguration
+      - org.springframework.ai.model.google.genai.autoconfigure.chat.GoogleGenAiChatAutoConfiguration
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5433/project2_loadtest?currentSchema=loadtest,public
+    username: loadtest_app
+    password: ${LOADTEST_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 3
+      minimum-idle: 1
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6380
+      username: ""
+      password: ""
+      database: 0
+      ssl:
+        enabled: false
+      repositories:
+        enabled: false
+  jpa:
+    # 최초 스키마 준비 시에만 실행 스크립트가 update로 변경한다.
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        default_schema: loadtest
+        hbm2ddl:
+          halt_on_error: true
+  ai:
+    model:
+      chat: none
+      embedding:
+        text: none
+    google:
+      genai:
+        api-key: ""
+        embedding:
+          api-key: ""
+  security:
+    oauth2:
+      client:
+        registration:
+          kakao:
+            client-id: loadtest-disabled
+            client-secret: loadtest-disabled
+          google:
+            client-id: loadtest-disabled
+            client-secret: loadtest-disabled
+
+app:
+  auth:
+    jwt:
+      secret-key: ${LOADTEST_JWT_SECRET}
+    cors:
+      allowed-origin: ${FRONTEND_ORIGIN:}
+    oauth2:
+      success-redirect-uri: http://localhost:3000/oauth/callback
+  security:
+    cookie:
+      secure: true
+      same-site: Lax
+  storage:
+    endpoint: ""
+    access-key: ""
+    secret-key: ""
+    public-base-url: ""
+  kakao:
+    rest-api-key: ""
+  review:
+    audit:
+      pseudonym-key: ${LOADTEST_REVIEW_AUDIT_KEY}
+      pseudonym-key-version: loadtest-v1
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never

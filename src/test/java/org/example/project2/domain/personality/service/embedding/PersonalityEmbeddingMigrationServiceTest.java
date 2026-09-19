@@ -14,7 +14,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,8 +47,8 @@ class PersonalityEmbeddingMigrationServiceTest {
         when(aiClient.embeddingModelName()).thenReturn("embedding-model");
         when(profileRepository.findAllByAiAnalysisConsentTrueAndSelfDescriptionIsNotNull(any(Pageable.class)))
                 .thenReturn(List.of(staleProfile, currentProfile));
-        when(embeddingRepository.findById(staleUserId)).thenReturn(Optional.of(staleEmbedding));
-        when(embeddingRepository.findById(currentUserId)).thenReturn(Optional.of(currentEmbedding));
+        when(embeddingRepository.findAllByProfileUserId(staleUserId)).thenReturn(List.of(staleEmbedding));
+        when(embeddingRepository.findAllByProfileUserId(currentUserId)).thenReturn(List.of(currentEmbedding));
 
         PersonalityEmbeddingMigrationService service = new PersonalityEmbeddingMigrationService(
                 profileRepository, embeddingRepository, aiClient, eventPublisher
@@ -74,7 +73,7 @@ class PersonalityEmbeddingMigrationServiceTest {
         when(aiClient.embeddingModelName()).thenReturn("embedding-model");
         when(profileRepository.findAllByAiAnalysisConsentTrueAndSelfDescriptionIsNotNull(any(Pageable.class)))
                 .thenReturn(List.of(profile));
-        when(embeddingRepository.findById(userId)).thenReturn(Optional.empty());
+        when(embeddingRepository.findAllByProfileUserId(userId)).thenReturn(List.of());
 
         PersonalityEmbeddingMigrationService service = new PersonalityEmbeddingMigrationService(
                 profileRepository, embeddingRepository, aiClient, eventPublisher

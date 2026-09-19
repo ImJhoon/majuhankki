@@ -11,6 +11,14 @@ npm.cmd run dev
 
 개발 서버는 `http://localhost:3000`에서 실행됩니다.
 
+공모전용 정적 데모는 운영 프런트와 별도로 빌드합니다.
+
+```powershell
+npm.cmd run build:demo
+```
+
+운영 산출물은 `dist`, 데모 산출물은 `dist-demo`에 생성됩니다. 데모는 고정 시나리오만 사용하며 운영 API·WebSocket·쿠키에 접근하지 않습니다.
+
 백엔드 환경변수는 다음과 같이 설정합니다.
 
 ```env

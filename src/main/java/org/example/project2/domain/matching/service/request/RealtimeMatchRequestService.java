@@ -29,9 +29,6 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
-import org.example.project2.domain.personality.service.ai.PersonalityAiClient;
-import org.example.project2.domain.personality.service.embedding.PersonalityEmbeddingDocument;
-import org.example.project2.domain.personality.service.embedding.PersonalityTextEmbeddingDocumentBuilder;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
@@ -53,7 +50,6 @@ public class RealtimeMatchRequestService {
             new GeometryFactory(new PrecisionModel(), 4326);
     private static final List<MatchRequestStatus> ACTIVE_STATUSES =
             List.of(MatchRequestStatus.WAITING, MatchRequestStatus.CONFIRMING);
-    private static final int EMBEDDING_DIMENSIONS = 1536;
 
     private final UserRepository userRepository;
     private final org.example.project2.domain.personality.repository.UserPersonalityProfileRepository profileRepository;
@@ -67,8 +63,6 @@ public class RealtimeMatchRequestService {
     private final MatchingProperties matchingProperties;
     private final RealtimeMatchWaitingReconciliationService waitingReconciliationService;
     private final ApplicationEventPublisher eventPublisher;
-    private final PersonalityAiClient aiClient;
-    private final PersonalityTextEmbeddingDocumentBuilder documentBuilder;
 
     @Transactional
     public RealtimeMatchRequestResponse create(
@@ -82,8 +76,7 @@ public class RealtimeMatchRequestService {
                 profileRepository.findByUserId(userId).orElse(null);
         if (profile == null
                 || user.getPersonalityOnboardingStatus() != org.example.project2.domain.user.entity.PersonalityOnboardingStatus.COMPLETED
-                || profile.getStyleTags() == null || profile.getStyleTags().isEmpty()
-                || profile.getAiKeywords() == null || profile.getAiKeywords().isEmpty()) {
+                || profile.getStyleTags() == null || profile.getStyleTags().isEmpty()) {
             throw new RealtimeMatchRequestException(
                     RealtimeMatchRequestErrorCode.PERSONALITY_PROFILE_REQUIRED
             );
@@ -124,26 +117,6 @@ public class RealtimeMatchRequestService {
                     request.desiredPersonalityText(),
                     PersonalityCompatibilityCalculator.FORMULA_VERSION
             );
-            if (matchRequest.getDesiredPersonalityText() != null && !matchRequest.getDesiredPersonalityText().isBlank()) {
-                try {
-                    List<String> keywords = aiClient.extractKeywords(matchRequest.getDesiredPersonalityText()).orElse(List.of());
-                    String textToEmbed = keywords.isEmpty()
-                            ? matchRequest.getDesiredPersonalityText()
-                            : String.join(", ", keywords);
-                    PersonalityEmbeddingDocument document = documentBuilder.build(textToEmbed);
-                    Optional<float[]> optionalEmbedding = aiClient.embed(document.sourceText());
-                    if (optionalEmbedding.isPresent() && optionalEmbedding.get().length == EMBEDDING_DIMENSIONS) {
-                        matchRequest.updateDesiredPersonalityEmbedding(
-                                optionalEmbedding.get(),
-                                aiClient.embeddingModelName(),
-                                document.sourceVersion(),
-                                Instant.now()
-                        );
-                    }
-                } catch (RuntimeException ignored) {
-                    // AI 호출 실패 시 태그 100% fallback을 사용하되 요청 생성은 계속 진행합니다.
-                }
-            }
             MatchRequest saved = matchRequestRepository.saveAndFlush(matchRequest);
             savedRequestId = saved.getId();
             activateWaitingSlot(userId, reservationToken, saved.getId(), saved.getLocation(), ttl);

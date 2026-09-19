@@ -38,7 +38,7 @@ public record PersonalityProfileUpsertRequest(
         boolean aiAnalysisConsent,
 
         @NotNull(message = "AI 키워드 목록은 필수입니다.")
-        @Size(min = 1, max = 5, message = "AI 키워드 태그는 최소 1개 이상 5개 이하로 추출해야 합니다.")
+        @Size(max = 5, message = "AI 키워드 태그는 최대 5개까지 입력할 수 있습니다.")
         List<@NotNull(message = "AI 키워드에는 null을 포함할 수 없습니다.") String> aiKeywords
 ) {
     public PersonalityProfileUpsertRequest(
@@ -68,7 +68,7 @@ public record PersonalityProfileUpsertRequest(
         if (styleTags == null || styleTags.size() < 3 || styleTags.size() > 5) {
             throw new InvalidPersonalityInputException("성향 태그는 최소 3개 이상 5개 이하로 선택해야 합니다.");
         }
-        if (aiKeywords == null || aiKeywords.isEmpty() || aiKeywords.size() > 5) {
+        if (aiAnalysisConsent && (aiKeywords == null || aiKeywords.isEmpty() || aiKeywords.size() > 5)) {
             throw new InvalidPersonalityInputException("AI 키워드 태그를 최소 1개 이상 추출해야 합니다.");
         }
 

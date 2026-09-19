@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:demo": "vite build --mode demo",
+    "test:demo": "node --test src/demo/scenario.test.js",
     "preview": "vite preview"
   },
   "devDependencies": {

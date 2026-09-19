@@ -54,7 +54,7 @@ class RealtimeMatchRequestCreateRequestTest {
     }
 
     @Test
-    void normalizesOptionalDesiredPersonalityTextAndRejectsTextOver300Characters() {
+    void normalizesOptionalDesiredPersonalityTextAndRejectsTextOver100Characters() {
         RealtimeMatchRequestCreateRequest normalized = requestWithText(
                 Set.of(
                         PersonalityTag.GOOD_LISTENER,
@@ -69,12 +69,12 @@ class RealtimeMatchRequestCreateRequestTest {
                         PersonalityTag.FOOD_TALK,
                         PersonalityTag.ENJOY_DESSERT
                 ),
-                "가".repeat(301)
+                "가".repeat(101)
         );
 
         assertThat(normalized.desiredPersonalityText()).isEqualTo("대화를 편하게 이어가는 분");
         assertThat(validator.validate(overLimit)).extracting(violation -> violation.getMessage())
-                .containsExactly("원하는 상대 성향 설명은 1자 이상 300자 이하로 입력할 수 있습니다.");
+                .containsExactly("원하는 상대 성향 설명은 1자 이상 100자 이하로 입력할 수 있습니다.");
     }
 
     @Test

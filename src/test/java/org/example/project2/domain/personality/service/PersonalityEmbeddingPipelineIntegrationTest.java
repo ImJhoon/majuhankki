@@ -68,7 +68,7 @@ class PersonalityEmbeddingPipelineIntegrationTest {
         }
         transactionTemplate.executeWithoutResult(status -> {
             answerRepository.deleteAllByUserId(user.getId());
-            embeddingRepository.findById(user.getId()).ifPresent(embeddingRepository::delete);
+            embeddingRepository.deleteAllByProfileUserId(user.getId());
             profileRepository.findById(user.getId()).ifPresent(profile -> {
                 // 현재 테스트 DB가 생성된 시점에 따라 태그 FK의 ON DELETE CASCADE가
                 // 없을 수 있으므로 요소 컬렉션을 먼저 비웁니다.
@@ -119,7 +119,7 @@ class PersonalityEmbeddingPipelineIntegrationTest {
 
         personalityService.upsertProfile(user.getId(), request(null, false));
 
-        assertThat(embeddingRepository.findById(user.getId())).isEmpty();
+        assertThat(embeddingRepository.findAllByProfileUserId(user.getId())).isEmpty();
         assertThat(profileRepository.findById(user.getId()).orElseThrow().getSelfDescription())
                 .isNull();
     }
@@ -134,16 +134,17 @@ class PersonalityEmbeddingPipelineIntegrationTest {
         );
 
         assertThat(response.selfDescription()).isEqualTo("AI 장애 테스트");
-        assertThat(embeddingRepository.findById(user.getId())).isEmpty();
+        assertThat(embeddingRepository.findAllByProfileUserId(user.getId())).isEmpty();
         verify(aiClient, timeout(5_000)).embed("AI 장애 테스트");
     }
 
     private UserPersonalityEmbedding awaitEmbedding() {
         long deadline = System.nanoTime() + 5_000_000_000L;
         while (System.nanoTime() < deadline) {
-            Optional<UserPersonalityEmbedding> embedding = embeddingRepository.findById(user.getId());
-            if (embedding.isPresent()) {
-                return embedding.get();
+            List<UserPersonalityEmbedding> embeddings = embeddingRepository.findAllByProfileUserId(user.getId());
+            if (!embeddings.isEmpty()) {
+                assertThat(embeddings).hasSize(1);
+                return embeddings.get(0);
             }
             try {
                 Thread.sleep(25L);
@@ -177,9 +178,10 @@ class PersonalityEmbeddingPipelineIntegrationTest {
                                 PersonalityAnswerValue.MEDIUM
                         )
                 ),
-                Set.of(PersonalityTag.GOOD_LISTENER),
+                Set.of(PersonalityTag.GOOD_LISTENER, PersonalityTag.FOOD_TALK, PersonalityTag.ENJOY_DESSERT),
                 selfDescription,
-                consent
+                consent,
+                List.of("keyword")
         );
     }
 }

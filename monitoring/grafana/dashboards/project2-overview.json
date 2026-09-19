@@ -4,7 +4,7 @@
   },
   "editable": false,
   "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
+  "graphTooltip": 1,
   "id": null,
   "links": [],
   "panels": [
@@ -88,7 +88,7 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 18,
+        "w": 12,
         "x": 6,
         "y": 0
       },
@@ -109,7 +109,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(http_server_requests_seconds_count{job=\"project2\"}[5m]))",
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"project2\",uri!~\"/actuator.*\"}[$__rate_interval]))",
           "legendFormat": "전체 요청",
           "range": true,
           "refId": "A"
@@ -117,6 +117,66 @@
       ],
       "title": "HTTP 요청량",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "project2-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "id": 9,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(increase(matching_completed_total{job=\"project2\"}[$__range]))",
+          "instant": true,
+          "legendFormat": "완료 수",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "선택 기간 최종 매칭 완료 수",
+      "type": "stat",
+      "description": "양쪽 수락 후 트랜잭션 커밋된 매칭 건수의 증가량입니다. Prometheus의 구간 외삽으로 소수가 표시될 수 있으며 정확한 집계 원장은 DB입니다."
     },
     {
       "datasource": {
@@ -156,7 +216,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(http_server_requests_seconds_sum{job=\"project2\"}[5m])) / sum(rate(http_server_requests_seconds_count{job=\"project2\"}[5m]))",
+          "expr": "sum(rate(http_server_requests_seconds_sum{job=\"project2\",uri!~\"/actuator.*\"}[$__rate_interval])) / sum(rate(http_server_requests_seconds_count{job=\"project2\",uri!~\"/actuator.*\"}[$__rate_interval]))",
           "legendFormat": "평균 응답 시간",
           "range": true,
           "refId": "A"
@@ -176,7 +236,8 @@
             "mode": "palette-classic"
           },
           "mappings": [],
-          "unit": "bytes"
+          "unit": "s",
+          "min": 0
         },
         "overrides": []
       },
@@ -186,7 +247,7 @@
         "x": 12,
         "y": 6
       },
-      "id": 4,
+      "id": 10,
       "options": {
         "legend": {
           "calcs": [],
@@ -203,14 +264,15 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (area) (jvm_memory_used_bytes{job=\"project2\"})",
-          "legendFormat": "JVM {{area}}",
+          "expr": "histogram_quantile(0.95, sum by (le, method, uri) (rate(http_server_requests_seconds_bucket{job=\"project2\",uri!~\"/actuator.*\"}[$__rate_interval])))",
+          "legendFormat": "{{method}} {{uri}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "JVM 메모리 사용량",
-      "type": "timeseries"
+      "title": "API별 응답 시간 (p95)",
+      "type": "timeseries",
+      "description": "Actuator 요청을 제외한 URI 템플릿·메서드별 히스토그램 추정값입니다. dev 프로필로 앱을 재시작하고 요청을 발생시켜야 합니다. 적은 표본에서는 변동이 큽니다."
     },
     {
       "datasource": {
@@ -223,7 +285,8 @@
             "mode": "palette-classic"
           },
           "mappings": [],
-          "unit": "short"
+          "unit": "s",
+          "min": 0
         },
         "overrides": []
       },
@@ -233,7 +296,7 @@
         "x": 0,
         "y": 14
       },
-      "id": 5,
+      "id": 11,
       "options": {
         "legend": {
           "calcs": [],
@@ -250,21 +313,15 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "hikaricp_connections_active{job=\"project2\"}",
-          "legendFormat": "활성 연결",
+          "expr": "histogram_quantile(0.99, sum by (le, method, uri) (rate(http_server_requests_seconds_bucket{job=\"project2\",uri!~\"/actuator.*\"}[$__rate_interval])))",
+          "legendFormat": "{{method}} {{uri}}",
           "range": true,
           "refId": "A"
-        },
-        {
-          "editorMode": "code",
-          "expr": "hikaricp_connections_max{job=\"project2\"}",
-          "legendFormat": "최대 연결",
-          "range": true,
-          "refId": "B"
         }
       ],
-      "title": "HikariCP 연결 수",
-      "type": "timeseries"
+      "title": "API별 응답 시간 (p99)",
+      "type": "timeseries",
+      "description": "Actuator 요청을 제외한 URI 템플릿·메서드별 히스토그램 추정값입니다. dev 프로필로 앱을 재시작하고 요청을 발생시켜야 합니다. 적은 표본에서는 변동이 큽니다."
     },
     {
       "datasource": {
@@ -277,7 +334,9 @@
             "mode": "palette-classic"
           },
           "mappings": [],
-          "unit": "percentunit"
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
         },
         "overrides": []
       },
@@ -287,7 +346,7 @@
         "x": 12,
         "y": 14
       },
-      "id": 6,
+      "id": 12,
       "options": {
         "legend": {
           "calcs": [],
@@ -304,14 +363,15 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "process_cpu_usage{job=\"project2\"}",
-          "legendFormat": "프로세스 CPU",
+          "expr": "(sum(rate(http_server_requests_seconds_count{job=\"project2\",uri!~\"/actuator.*\",status=~\"5..\"}[$__rate_interval])) or (0 * sum(rate(http_server_requests_seconds_count{job=\"project2\",uri!~\"/actuator.*\"}[$__rate_interval])))) / (sum(rate(http_server_requests_seconds_count{job=\"project2\",uri!~\"/actuator.*\"}[$__rate_interval])) > 0)",
+          "legendFormat": "5xx 비율",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "애플리케이션 CPU 사용률",
-      "type": "timeseries"
+      "title": "HTTP 서버 오류 비율 (5xx)",
+      "type": "timeseries",
+      "description": "Actuator 요청을 제외합니다. 트래픽이 있으나 5xx 시계열이 없으면 0%, 요청이 없거나 수집되지 않으면 데이터 없음으로 표시합니다."
     },
     {
       "datasource": {
@@ -351,14 +411,15 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (result) (rate(matching_requests_total{job=\"project2\"}[5m]))",
+          "expr": "sum by (result) (rate(matching_requests_total{job=\"project2\"}[$__rate_interval]))",
           "legendFormat": "{{result}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "매칭 후보 제안 처리량",
-      "type": "timeseries"
+      "title": "매칭 후보 탐색 시도량 (재시도 포함)",
+      "type": "timeseries",
+      "description": "사용자 요청 수가 아닌 후보 탐색 시도 수입니다. created=제안 생성, no_candidate=후보 없음, skipped=종료·상태 변경, retry_later=재시도 보류입니다."
     },
     {
       "datasource": {
@@ -398,13 +459,167 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by (le, result) (rate(matching_duration_seconds_bucket{job=\"project2\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le, result) (rate(matching_duration_seconds_bucket{job=\"project2\"}[$__rate_interval])))",
           "legendFormat": "{{result}} p95",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "매칭 처리 시간 (p95)",
+      "title": "매칭 후보 탐색 1회 소요 시간 (p95)",
+      "type": "timeseries",
+      "description": "사용자의 요청부터 최종 매칭까지 걸린 시간이 아닌 탐색 호출 1회의 처리 시간입니다."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "project2-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 30
+      },
+      "id": 16,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum by (result) (rate(matching_requests_total{job=\"project2\"}[$__rate_interval])) / ignoring(result) group_left (sum(rate(matching_requests_total{job=\"project2\"}[$__rate_interval])) > 0)",
+          "legendFormat": "{{result}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "매칭 탐색 결과 비율 (성사율 아님)",
+      "type": "timeseries",
+      "description": "재시도를 포함한 탐색 시도 중 결과별 비율입니다. no_candidate는 후보 부족이며 기술적 오류가 아닙니다. 사용자 요청 성사율로 해석하지 않습니다."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "project2-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "unit": "ops",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 30
+      },
+      "id": 15,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "rate(hikaricp_connections_timeout_total{job=\"project2\"}[$__rate_interval])",
+          "legendFormat": "{{instance}} / {{pool}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "HikariCP 연결 획득 타임아웃 발생률",
+      "type": "timeseries",
+      "description": "DB 연결 획득 제한 시간을 초과한 초당 횟수입니다. DB 쿼리 타임아웃 횟수와는 다릅니다."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "project2-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 38
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "hikaricp_connections_active{job=\"project2\"}",
+          "legendFormat": "활성 연결 {{instance}} / {{pool}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "hikaricp_connections_max{job=\"project2\"}",
+          "legendFormat": "최대 연결 {{instance}} / {{pool}}",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "HikariCP 연결 수",
       "type": "timeseries"
     },
     {
@@ -415,56 +630,189 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
+          "unit": "short",
+          "min": 0
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
-        "w": 6,
-        "x": 0,
-        "y": 30
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 38
       },
-      "id": 9,
+      "id": 13,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "textMode": "auto"
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       },
       "pluginVersion": "13.2.0",
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(increase(matching_completed_total[$__range]))",
-          "instant": true,
-          "legendFormat": "완료 수",
-          "range": false,
+          "expr": "hikaricp_connections_pending{job=\"project2\"}",
+          "legendFormat": "{{instance}} / {{pool}}",
+          "range": true,
           "refId": "A"
         }
       ],
-      "title": "선택 기간 최종 매칭 완료 수",
-      "type": "stat"
+      "title": "HikariCP 연결 대기 수",
+      "type": "timeseries",
+      "description": "DB 연결을 기다리는 스레드 수입니다. 활성 연결 수와 함께 비교해 커넥션 풀 포화를 확인합니다."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "project2-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 46
+      },
+      "id": 14,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "rate(hikaricp_connections_acquire_seconds_sum{job=\"project2\"}[$__rate_interval]) / (rate(hikaricp_connections_acquire_seconds_count{job=\"project2\"}[$__rate_interval]) > 0)",
+          "legendFormat": "{{instance}} / {{pool}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "HikariCP 평균 연결 획득 시간",
+      "type": "timeseries",
+      "description": "연결 획득에 걸린 평균 시간입니다. 쿼리 실행 시간이 아니며 해당 구간에 획득이 없으면 표시하지 않습니다."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "project2-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 46
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "process_cpu_usage{job=\"project2\"}",
+          "legendFormat": "프로세스 CPU {{instance}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "애플리케이션 CPU 사용률",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "project2-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 54
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum by (area) (jvm_memory_used_bytes{job=\"project2\"})",
+          "legendFormat": "JVM {{area}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "JVM 메모리 사용량",
+      "type": "timeseries"
     }
   ],
   "refresh": "15s",
@@ -482,7 +830,8 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Project2 기본 모니터링",
+  "title": "Project2 API·매칭 성능 모니터링",
   "uid": "project2-overview",
-  "version": 1
+  "version": 2,
+  "description": "개발 환경의 API 지연·오류, 매칭 후보 탐색, DB 연결 병목을 관측합니다. HTTP 통계는 Actuator 요청을 제외합니다."
 }

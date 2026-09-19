@@ -203,7 +203,7 @@ class PersonalityControllersTest {
     @Test
     void rejectsMoreThanFivePersonalityTags() throws Exception {
         String invalidRequest = validProfileRequest().replace(
-                "[\"GOOD_LISTENER\"]",
+                "[\"GOOD_LISTENER\", \"FOOD_TALK\", \"ENJOY_DESSERT\"]",
                 "[\"GOOD_LISTENER\", \"FOOD_TALK\", \"LIGHT_CHAT\", \"DEEP_TALK\", \"COMFORTABLE_SILENCE\", \"CALM_ATMOSPHERE\"]"
         );
 
@@ -348,7 +348,7 @@ class PersonalityControllersTest {
                     {"questionCode": "PLANNING_STYLE", "value": 5},
                     {"questionCode": "NOVELTY_PREFERENCE", "value": 3}
                   ],
-                  "styleTags": ["GOOD_LISTENER"],
+                  "styleTags": ["GOOD_LISTENER", "FOOD_TALK", "ENJOY_DESSERT"],
                   "selfDescription": null,
                   "aiAnalysisConsent": false
                 }

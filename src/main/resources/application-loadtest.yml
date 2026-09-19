@@ -1,0 +1,9 @@
+# import 목록의 마지막 설정이 공통 설정을 덮어쓴다.
+# ai/auth/db를 프로필로 함께 활성화하지 않는다.
+spring:
+  config:
+    import:
+      - classpath:application-ai.yml
+      - classpath:application-auth.yml
+      - classpath:application-db.yml
+      - classpath:loadtest/settings.yml

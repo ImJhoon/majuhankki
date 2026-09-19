@@ -224,7 +224,7 @@ class ReviewCommandServiceTest {
         when(userReviewRepository.existsByMatch_IdAndReviewer_IdAndReviewee_Id(301L, reviewerId, revieweeId))
                 .thenReturn(false);
         when(userReviewRepository.saveAndFlush(any(UserReview.class)))
-                .thenThrow(new DataIntegrityViolationException("unique"));
+                .thenThrow(duplicateViolation());
 
         assertThatThrownBy(() -> service.create(
                 reviewerId,
@@ -248,7 +248,7 @@ class ReviewCommandServiceTest {
             if (rowStored.compareAndSet(false, true)) {
                 return saved;
             }
-            throw new DataIntegrityViolationException("uk_user_review_match_reviewer_reviewee");
+            throw duplicateViolation();
         });
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -348,4 +348,10 @@ class ReviewCommandServiceTest {
                 .nickname("사용자-" + id.toString().substring(0, 8))
                 .build();
     }
+    private DataIntegrityViolationException duplicateViolation() {
+        return new DataIntegrityViolationException("duplicate", new org.hibernate.exception.ConstraintViolationException(
+                "duplicate", new java.sql.SQLException("duplicate", "23505"),
+                "uk_user_review_match_reviewer_reviewee"));
+    }
+
 }

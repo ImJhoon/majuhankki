@@ -102,7 +102,7 @@ class MatchProposalInteractionServiceTest {
         assertThat(response.partner().profileImageUrl()).isEqualTo("https://cdn.example/profile.png");
         assertThat(response.partner().description()).isEqualTo("같이 편하게 식사하고 싶어요.");
         assertThat(response.partner().styleTags()).containsExactly(PersonalityTag.GOOD_LISTENER);
-        assertThat(response.compatibilityScore()).isEqualTo((short) 74);
+        assertThat(response.compatibilityScore()).isEqualTo((short) 81);
         assertThat(response.compatibilityReasons()).containsExactly("대화 선호가 잘 맞아요.");
 
         Set<String> partnerFields = Arrays.stream(MatchProposalPartnerProfileResponse.class.getRecordComponents())

@@ -6,6 +6,7 @@ import org.example.project2.domain.personality.entity.PersonalityTag;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -46,8 +47,8 @@ class PersonalityCompatibilityCalculatorTest {
         );
 
         assertThat(result.tagScore()).isEqualTo((short) 100);
-        assertThat(result.embeddingScore()).isEqualTo((short) 50);
-        assertThat(result.score()).isEqualTo((short) 90);
+        assertThat(result.embeddingScore()).isEqualTo((short) 0);
+        assertThat(result.score()).isEqualTo((short) 80);
     }
 
     @Test
@@ -153,7 +154,7 @@ class PersonalityCompatibilityCalculatorTest {
     }
 
     @Test
-    void normalizesIdenticalOrthogonalAndOppositeVectorsToHundredFiftyAndZero() {
+    void normalizesIdenticalOrthogonalAndOppositeVectorsToHundredZeroAndZero() {
         PersonalityEmbeddingVector desired = embedding(new float[]{1, 0}, "PERSONALITY_FREE_TEXT_V2");
 
         PersonalityCompatibilityScore identical = calculator.calculate(
@@ -170,8 +171,28 @@ class PersonalityCompatibilityCalculatorTest {
         );
 
         assertThat(identical.embeddingScore()).isEqualTo((short) 100);
-        assertThat(orthogonal.embeddingScore()).isEqualTo((short) 50);
+        assertThat(orthogonal.embeddingScore()).isEqualTo((short) 0);
         assertThat(opposite.embeddingScore()).isEqualTo((short) 0);
+    }
+
+    @Test
+    void scalesSemanticSimilarityAndSelectsBestKeywordMatch() {
+        PersonalityEmbeddingVector desired = embedding(new float[]{1, 0}, "PERSONALITY_FREE_TEXT_V2");
+        float[] similarities = {0.1f, 0.2f, 0.35f, 0.5f, 0.75f};
+        short[] expectedScores = {15, 30, 50, 70, 85};
+        for (int index = 0; index < similarities.length; index++) {
+            float similarity = similarities[index];
+            PersonalityEmbeddingVector candidate = embedding(
+                    new float[]{similarity, (float) Math.sqrt(1 - similarity * similarity)},
+                    "PERSONALITY_FREE_TEXT_V2");
+            assertThat(calculator.calculate(Set.of(), Set.of(), desired, candidate).embeddingScore())
+                    .isEqualTo(expectedScores[index]);
+        }
+        var best = calculator.calculateWithList(Set.of(), Set.of(), desired, List.of(
+                embedding(new float[]{0, 1}, "PERSONALITY_FREE_TEXT_V2"),
+                embedding(new float[]{1, 0}, "PERSONALITY_FREE_TEXT_V2"),
+                embedding(new float[]{-1, 0}, "PERSONALITY_FREE_TEXT_V2")));
+        assertThat(best.embeddingScore()).isEqualTo((short) 100);
     }
 
     @Test
@@ -189,12 +210,12 @@ class PersonalityCompatibilityCalculatorTest {
                 embedding(new float[]{0, 1}, "PERSONALITY_FREE_TEXT_V2")
         );
 
-        assertThat(withMatchingTag.embeddingScore()).isEqualTo((short) 50);
-        assertThat(withDifferentTag.embeddingScore()).isEqualTo((short) 50);
+        assertThat(withMatchingTag.embeddingScore()).isEqualTo((short) 0);
+        assertThat(withDifferentTag.embeddingScore()).isEqualTo((short) 0);
         assertThat(withMatchingTag.tagScore()).isEqualTo((short) 100);
         assertThat(withDifferentTag.tagScore()).isEqualTo((short) 0);
-        assertThat(withMatchingTag.score()).isEqualTo((short) 90);
-        assertThat(withDifferentTag.score()).isEqualTo((short) 10);
+        assertThat(withMatchingTag.score()).isEqualTo((short) 80);
+        assertThat(withDifferentTag.score()).isEqualTo((short) 0);
     }
 
     @Test
